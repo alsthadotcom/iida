@@ -449,3 +449,33 @@ export async function deleteDocument(filePath: string): Promise<{ error: any }> 
 
     return { error };
 }
+
+// ============================================
+// DASHBOARD OPERATIONS
+// ============================================
+
+export async function getUserListings(userId: string): Promise<{ data: MarketplaceView[] | null; error: any }> {
+    // 1. Get username
+    const { data: userInfo, error: userError } = await getUserInfoById(userId);
+    if (userError || !userInfo) {
+        return { data: null, error: userError || new Error('User not found') };
+    }
+
+    // 2. Query marketplace view by username
+    const { data, error } = await supabase
+        .from('marketplace')
+        .select('*')
+        .eq('username', userInfo.username)
+        .order('created_at', { ascending: false });
+
+    return { data, error };
+}
+
+export async function deleteListing(ideaId: string): Promise<{ error: any }> {
+    const { error } = await supabase
+        .from('idea_listing')
+        .delete()
+        .eq('idea_id', ideaId);
+
+    return { error };
+}
