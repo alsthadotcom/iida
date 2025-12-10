@@ -184,9 +184,9 @@ export const ItemDetails: React.FC<ItemDetailsProps> = ({ ideaId, onBack }) => {
                                 Minimum Viable Product
                             </h2>
                             <div className="bg-zinc-950/50 border border-zinc-800 rounded-lg p-6">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <CheckBadgeIcon className="w-6 h-6 text-green-500" />
-                                    <span className="text-lg font-semibold text-white">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <CheckBadgeIcon className="w-5 h-5 text-green-500" />
+                                    <span className="text-sm font-medium text-white">
                                         {item.mvp_type} MVP Available
                                     </span>
                                 </div>
