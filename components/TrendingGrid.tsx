@@ -7,6 +7,47 @@ import { ArrowTrendingUpIcon, StarIcon } from '@heroicons/react/24/solid';
 import { getTopRatedMarketplaceItems } from '../services/database';
 import type { MarketplaceView } from '../types/database';
 
+const MiniRadial: React.FC<{ value: number }> = ({ value }) => {
+    const radius = 16; // Internal SVG radius
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - (value / 100) * circumference;
+
+    // Color logic based on value
+    let colorClass = 'text-green-500';
+    if (value < 40) colorClass = 'text-red-500';
+    else if (value < 70) colorClass = 'text-yellow-500';
+
+    const strokeClass = colorClass.replace('text-', 'stroke-');
+
+    return (
+        <div className="relative w-16 h-16 flex items-center justify-center">
+            {/* Background */}
+            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 40 40">
+                <circle
+                    cx="20"
+                    cy="20"
+                    r={radius}
+                    className="stroke-zinc-800"
+                    strokeWidth="3"
+                    fill="transparent"
+                />
+                <circle
+                    cx="20"
+                    cy="20"
+                    r={radius}
+                    className={strokeClass}
+                    strokeWidth="3"
+                    fill="transparent"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={offset}
+                    strokeLinecap="round"
+                />
+            </svg>
+            <span className={`absolute text-sm font-bold ${colorClass}`}>{value}</span>
+        </div>
+    );
+};
+
 interface TrendingGridProps {
     limit?: number;
     showHeader?: boolean;
@@ -96,8 +137,9 @@ export const TrendingGrid: React.FC<TrendingGridProps> = ({ limit = 4, showHeade
                     >
                         <div className={`absolute top-0 left-0 w-full h-0.5 ${getCategoryColor(index)} opacity-50`}></div>
 
+                        {/* Header: Username & Rating */}
                         <div className="flex justify-between items-start mb-3">
-                            <span className="text-[10px] text-zinc-500 font-mono border border-zinc-800 px-1.5 py-0.5 rounded">
+                            <span className="text-[10px] text-zinc-300 border-zinc-700 border px-2 py-1 rounded font-mono">
                                 @{item.username.replace(/^@/, '').toLowerCase()}
                             </span>
                             <div className="flex items-center space-x-1 text-zinc-400">
@@ -106,23 +148,29 @@ export const TrendingGrid: React.FC<TrendingGridProps> = ({ limit = 4, showHeade
                             </div>
                         </div>
 
-                        <h4 className="text-zinc-100 font-medium leading-tight mb-2 group-hover:text-white truncate">
+                        {/* Title & Description */}
+                        <h4 className="text-white font-bold text-lg leading-tight mb-2 group-hover:text-green-400 transition-colors truncate">
                             {item.title}
                         </h4>
-                        <p className="text-zinc-500 text-xs line-clamp-2 mb-4 h-8">
+                        <p className="text-zinc-400 text-sm line-clamp-2 mb-4 h-10">
                             {item.description}
                         </p>
 
-                        <div className="flex items-end justify-between border-t border-zinc-800 pt-3 mt-auto">
+                        {/* 3 Circular Indicators */}
+                        <div className="flex flex-nowrap gap-4 justify-center mb-6">
+                            {/* Map data to the 3 radials: Uniqueness, Viability, Scalability/Overall */}
+                            <MiniRadial value={Math.round(item.uniqueness || 0)} />
+                            <MiniRadial value={Math.round(item.viability || 0)} />
+                            <MiniRadial value={Math.round(item.overall_score * 10)} />
+                        </div>
+
+                        {/* Footer: Price */}
+                        <div className="flex items-end justify-between border-t border-zinc-800 pt-4 mt-auto">
                             <div>
-                                <div className="text-[10px] text-zinc-500 uppercase">Price</div>
-                                <div className="text-lg font-bold text-zinc-200">
+                                <div className="text-[10px] text-zinc-500 uppercase font-semibold tracking-wider">Asking price</div>
+                                <div className="text-2xl font-bold text-white">
                                     ${item.price.toLocaleString()}
                                 </div>
-                            </div>
-                            <div className="text-right">
-                                <div className="text-[10px] text-zinc-500 uppercase">Uniqueness</div>
-                                <div className="text-sm font-mono text-green-400">{item.uniqueness}</div>
                             </div>
                         </div>
                     </div>
