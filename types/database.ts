@@ -10,6 +10,7 @@ export interface UserInfo {
     name: string;
     email: string;
     username: string; // Format: @username (lowercase alphanumeric only)
+    password?: string; // Added as per requirement
     profile_picture?: string | null; // URL to profile picture
     created_at?: string;
     updated_at?: string;

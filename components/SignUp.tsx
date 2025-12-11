@@ -3,7 +3,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { supabase } from '../services/supabase';
 
@@ -17,15 +17,55 @@ export const SignUp: React.FC<SignUpProps> = ({ onLogin, onBack }) => {
     const [lastName, setLastName] = useState('');
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
-    const [password, setPassword] = useState(''); // Note: Password field was implicit in email flow, usually needed. Added it.
-    // Wait, the previous UI form didn't explicitly have a password field in the "Manual Form" section shown in the read (lines 54-79)?
-    // Let me re-read the previous file content very carefully.
-    // Lines 55-64: First/Last Name. Line 67: Username. Line 72: Email.
-    // Line 76: Button. 
-    // THERE WAS NO PASSWORD FIELD in the previous code! Authentication requires a password. I MUST ADD A PASSWORD FIELD.
+    const [password, setPassword] = useState('');
+
+    // Google Completion State
+    const [isGoogleCompletion, setIsGoogleCompletion] = useState(false);
+    const [googleUserId, setGoogleUserId] = useState<string | null>(null);
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Check for existing Google session on mount
+    useEffect(() => {
+        const checkSession = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                // User is authenticated. Check if they need to complete profile.
+                const { data: info } = await supabase.from('user_info').select('password').eq('user_id', user.id).single();
+
+                // If user_info exists and has a password (and username?), they are done.
+                if (info && info.password) {
+                    // Already complete. Redirect to dashboard or home.
+                    window.location.href = '/pages/dashboard.html';
+                    return;
+                }
+
+                // If not complete, pre-fill form
+                setIsGoogleCompletion(true);
+                setGoogleUserId(user.id);
+                setEmail(user.email || '');
+
+                // Try to extract names
+                const meta = user.user_metadata;
+                if (meta) {
+                    if (meta.full_name) {
+                        const parts = meta.full_name.split(' ');
+                        if (parts.length > 0) setFirstName(parts[0]);
+                        if (parts.length > 1) setLastName(parts.slice(1).join(' '));
+                    } else {
+                        if (meta.first_name) setFirstName(meta.first_name);
+                        if (meta.last_name) setLastName(meta.last_name);
+                    }
+                    if (meta.name) { // Fallback
+                        const parts = meta.name.split(' ');
+                        if (!firstName && parts.length > 0) setFirstName(parts[0]);
+                    }
+                }
+            }
+        };
+        checkSession();
+    }, []);
 
     const handleSignUp = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -44,45 +84,54 @@ export const SignUp: React.FC<SignUpProps> = ({ onLogin, onBack }) => {
                 throw new Error('Username must contain only lowercase letters and numbers');
             }
 
-            // Create auth user
-            const { data: authData, error: authError } = await supabase.auth.signUp({
-                email,
-                password,
-                options: {
-                    data: {
-                        first_name: firstName,
-                        last_name: lastName,
-                        username: formattedUsername,
-                    },
-                },
-            });
+            let userId = googleUserId;
 
-            if (authError) {
-                // Check if error is due to duplicate email
-                if (authError.message.toLowerCase().includes('already registered') ||
-                    authError.message.toLowerCase().includes('already exists') ||
-                    authError.message.toLowerCase().includes('user already registered')) {
-                    throw new Error('DUPLICATE_EMAIL');
+            if (isGoogleCompletion && userId) {
+                // Update existing Google user password
+                const { error: updateError } = await supabase.auth.updateUser({ password });
+                if (updateError) throw updateError;
+            } else {
+                // Standard Sign Up
+                const { data: authData, error: authError } = await supabase.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        data: {
+                            first_name: firstName,
+                            last_name: lastName,
+                            username: formattedUsername,
+                        },
+                    },
+                });
+
+                if (authError) {
+                    if (authError.message.toLowerCase().includes('already registered') ||
+                        authError.message.toLowerCase().includes('already exists')) {
+                        throw new Error('DUPLICATE_EMAIL');
+                    }
+                    throw authError;
                 }
-                throw authError;
+                if (authData.user) userId = authData.user.id;
             }
 
-            // Create user_info record in database
-            if (authData.user) {
+            // Create/Update user_info record
+            if (userId) {
+                // Save password to user_info as requested (Not Recommended for Production)
+                const userInfoData = {
+                    user_id: userId,
+                    name: `${firstName} ${lastName}`,
+                    email: email,
+                    username: formattedUsername,
+                    password: password
+                };
+
                 const { error: dbError } = await supabase
                     .from('user_info')
-                    .insert([{
-                        user_id: authData.user.id,
-                        name: `${firstName} ${lastName}`,
-                        email: email,
-                        username: formattedUsername
-                    }]);
+                    .upsert([userInfoData]); // upsert to handle if row exists but empty
 
                 if (dbError) {
-                    // If username already exists
                     if (dbError.message.includes('unique') || dbError.message.includes('duplicate')) {
-                        // Clean up auth user
-                        await supabase.auth.admin.deleteUser(authData.user.id);
+                        if (!isGoogleCompletion) await supabase.auth.admin.deleteUser(userId); // Cleanup only if new
                         throw new Error('Username already taken. Please choose another one.');
                     }
                     throw dbError;
@@ -90,8 +139,12 @@ export const SignUp: React.FC<SignUpProps> = ({ onLogin, onBack }) => {
             }
 
             // Success
-            alert('Sign up successful! Please check your email for verification if required.');
-            onLogin();
+            if (isGoogleCompletion) {
+                window.location.href = '/pages/dashboard.html';
+            } else {
+                alert('Sign up successful! Please check your email for verification if required.');
+                onLogin();
+            }
 
         } catch (err: any) {
             if (err.message === 'DUPLICATE_EMAIL') {
@@ -109,7 +162,8 @@ export const SignUp: React.FC<SignUpProps> = ({ onLogin, onBack }) => {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: window.location.origin
+                    // Redirect back to this page to complete profile
+                    redirectTo: window.location.href
                 }
             });
             if (error) throw error;
@@ -133,7 +187,7 @@ export const SignUp: React.FC<SignUpProps> = ({ onLogin, onBack }) => {
 
                 <div className="flex flex-col items-center mb-6 sm:mb-8 mt-2">
                     <span className="text-3xl sm:text-4xl text-white font-handwritten font-bold mb-2">ida.</span>
-                    <h2 className="text-xl sm:text-2xl font-bold text-white">Create your account</h2>
+                    <h2 className="text-xl sm:text-2xl font-bold text-white">{isGoogleCompletion ? 'Complete your account' : 'Create your account'}</h2>
                     <p className="text-zinc-500 text-sm">Join the marketplace for ideas</p>
                 </div>
 
@@ -163,26 +217,30 @@ export const SignUp: React.FC<SignUpProps> = ({ onLogin, onBack }) => {
                 )}
 
                 {/* Google Sign In */}
-                <button
-                    onClick={handleGoogleSignIn}
-                    className="w-full flex items-center justify-center gap-3 bg-white text-black font-semibold py-3 rounded-lg hover:bg-zinc-200 transition-colors mb-6"
-                >
-                    <svg className="w-5 h-5" viewBox="0 0 24 24">
-                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                    </svg>
-                    Sign up with Google
-                </button>
+                {!isGoogleCompletion && (
+                    <button
+                        onClick={handleGoogleSignIn}
+                        className="w-full flex items-center justify-center gap-3 bg-white text-black font-semibold py-3 rounded-lg hover:bg-zinc-200 transition-colors mb-6"
+                    >
+                        <svg className="w-5 h-5" viewBox="0 0 24 24">
+                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                        </svg>
+                        Sign up with Google
+                    </button>
+                )}
 
                 {/* Separator */}
-                <div className="relative flex items-center justify-center mb-6">
-                    <div className="absolute inset-0 flex items-center">
-                        <div className="w-full border-t border-zinc-800"></div>
+                {!isGoogleCompletion && (
+                    <div className="relative flex items-center justify-center mb-6">
+                        <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-zinc-800"></div>
+                        </div>
+                        <span className="relative bg-[#101012] px-2 text-xs text-zinc-500 uppercase font-mono">or</span>
                     </div>
-                    <span className="relative bg-[#101012] px-2 text-xs text-zinc-500 uppercase font-mono">or</span>
-                </div>
+                )}
 
                 {/* Manual Form */}
                 <form className="space-y-4" onSubmit={handleSignUp}>
@@ -229,7 +287,8 @@ export const SignUp: React.FC<SignUpProps> = ({ onLogin, onBack }) => {
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-green-500 transition-colors placeholder:text-zinc-700"
+                            disabled={isGoogleCompletion}
+                            className={`w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-green-500 transition-colors placeholder:text-zinc-700 ${isGoogleCompletion ? 'opacity-50 cursor-not-allowed' : ''}`}
                             placeholder="you@example.com"
                             required
                         />
@@ -253,7 +312,7 @@ export const SignUp: React.FC<SignUpProps> = ({ onLogin, onBack }) => {
                         disabled={loading}
                         className="w-full bg-green-500 text-black font-bold py-3 rounded-lg hover:bg-green-400 transition-colors mt-4 shadow-[0_0_20px_rgba(34,197,94,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {loading ? 'Creating Account...' : 'Sign Up'}
+                        {loading ? (isGoogleCompletion ? 'Saving...' : 'Creating Account...') : (isGoogleCompletion ? 'Complete Profile' : 'Sign Up')}
                     </button>
                 </form>
 

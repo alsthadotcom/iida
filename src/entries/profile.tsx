@@ -190,6 +190,14 @@ const ProfilePage = () => {
 
             if (updateError) throw updateError;
 
+            // 4. Update Password in user_info table (as requested)
+            const { error: userInfoError } = await supabase
+                .from('user_info')
+                .update({ password: newPassword })
+                .eq('user_id', user.id);
+
+            if (userInfoError) console.error("Failed to update user_info password", userInfoError);
+
             // Success
             setPasswordMessage({ type: 'success', text: 'Password updated successfully' });
             setCurrentPassword('');
