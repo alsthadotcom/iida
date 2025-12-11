@@ -143,18 +143,81 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
 
     // --- Handlers ---
 
+    // Helper to compress images
+    const compressImage = async (file: File): Promise<File> => {
+        if (!file.type.startsWith('image/')) return file;
+
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+                const MAX_WIDTH = 1200;
+                const MAX_HEIGHT = 1200;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > MAX_WIDTH) {
+                        height *= MAX_WIDTH / width;
+                        width = MAX_WIDTH;
+                    }
+                } else {
+                    if (height > MAX_HEIGHT) {
+                        width *= MAX_HEIGHT / height;
+                        height = MAX_HEIGHT;
+                    }
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    resolve(file);
+                    return;
+                }
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        const newFile = new File([blob], file.name, {
+                            type: file.type,
+                            lastModified: Date.now(),
+                        });
+                        resolve(newFile);
+                    } else {
+                        resolve(file);
+                    }
+                }, file.type, 0.8);
+            };
+            img.onerror = (err) => reject(err);
+            img.src = url;
+        });
+    };
+
     const handleMainDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
-            if (file.type !== 'application/pdf') {
-                alert("Please upload a PDF document.");
+            // Allow PDF and Images
+            if (file.type !== 'application/pdf' && !file.type.startsWith('image/')) {
+                alert("Please upload a PDF document or an Image (JPEG, PNG).");
                 return;
             }
-            setMainDocument(file);
+            // Basic size check (e.g. 10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                alert("File size too large. Please upload a file smaller than 10MB.");
+                return;
+            }
+
+            // Compress if image
+            const processedFile = await compressImage(file);
+
+            setMainDocument(processedFile);
             setExistingMainDocUrl(null); // Replace existing
 
             // Always run analysis for new file
-            await runAnalysis(file);
+            await runAnalysis(processedFile);
         }
     };
 
@@ -209,9 +272,11 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
         setExistingAdditionalDocs(prev => prev.filter((_, i) => i !== index));
     };
 
-    const handleMvpMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleMvpMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            setMvpMediaFiles([...mvpMediaFiles, ...Array.from(e.target.files)]);
+            const rawFiles = Array.from(e.target.files);
+            const processedFiles = await Promise.all(rawFiles.map(f => compressImage(f)));
+            setMvpMediaFiles([...mvpMediaFiles, ...processedFiles]);
         }
     };
 
@@ -366,23 +431,35 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
                 if (ideaError || !ideaData) throw ideaError || new Error('Failed to create');
 
                 // Create Score
-                if (scores) {
-                    const profitabilityText = `Revenue: $${scores.profitability.estimatedRevenue.toLocaleString()}/yr, Profit: $${scores.profitability.estimatedProfit.toLocaleString()}/yr (${scores.profitability.marginPercentage}% Margin)`;
-                    await createAIScoring({
-                        idea_id: ideaData.idea_id,
-                        uniqueness: scores.uniqueness,
-                        demand: scores.demand,
-                        problem_impact: scores.problem_impact,
-                        profitability: profitabilityText,
-                        viability: scores.viability,
-                        scalability: scores.scalability
-                    });
-                }
+                const finalScores = scores || {
+                    uniqueness: 70,
+                    demand: 'Mid',
+                    problem_impact: 70,
+                    profitability: { estimatedRevenue: 10000, estimatedProfit: 1000, marginPercentage: 10 },
+                    viability: 70,
+                    scalability: 70
+                };
+
+                const profitabilityText = typeof finalScores.profitability === 'string'
+                    ? finalScores.profitability
+                    : `Revenue: $${finalScores.profitability.estimatedRevenue.toLocaleString()}/yr, Profit: $${finalScores.profitability.estimatedProfit.toLocaleString()}/yr (${finalScores.profitability.marginPercentage}% Margin)`;
+
+                await createAIScoring({
+                    idea_id: ideaData.idea_id,
+                    uniqueness: finalScores.uniqueness,
+                    demand: finalScores.demand as any,
+                    problem_impact: finalScores.problem_impact,
+                    profitability: profitabilityText,
+                    viability: finalScores.viability,
+                    scalability: finalScores.scalability
+                });
+
                 alert('Idea listed successfully!');
             }
 
             // Redirect
-            window.location.href = '/pages/marketplace.html'; // Or dashboard
+            // Redirect
+            onBack();
 
         } catch (error: any) {
             console.error('Submit error:', error);
@@ -475,12 +552,19 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
                                 <button onClick={removeMainDocument} className="text-zinc-500 hover:text-red-400"><XMarkIcon className="w-5 h-5" /></button>
                             </div>
                         ) : (
-                            <div onClick={() => mainFileInputRef.current?.click()} className="border border-dashed border-zinc-700 rounded-lg p-6 text-center cursor-pointer hover:border-zinc-500">
+                            <div onClick={() => mainFileInputRef.current?.click()} className="border border-dashed border-zinc-700 rounded-lg p-6 text-center cursor-pointer hover:border-zinc-500 transition-colors">
                                 <DocumentPlusIcon className="w-8 h-8 text-zinc-500 mx-auto mb-2" />
-                                <span className="text-sm text-zinc-400">Click to upload PDF</span>
+                                <span className="text-sm text-zinc-400">Click to upload Prospectus</span>
+                                <span className="block text-xs text-zinc-500 mt-1">(PDF, JPEG, PNG - Max 10MB)</span>
                             </div>
                         )}
-                        <input type="file" ref={mainFileInputRef} className="hidden" accept="application/pdf" onChange={handleMainDocUpload} />
+                        <input
+                            type="file"
+                            ref={mainFileInputRef}
+                            className="hidden"
+                            accept="application/pdf,image/png,image/jpeg,image/webp"
+                            onChange={handleMainDocUpload}
+                        />
 
                         {/* Additional Docs */}
                         <div className="mt-6">

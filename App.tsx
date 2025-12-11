@@ -1,7 +1,7 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
-*/
+ */
 import React, { useState, useEffect } from 'react';
 import { Hero } from './components/Hero';
 import { InputArea } from './components/InputArea';
@@ -16,12 +16,13 @@ import { Login } from './components/Login';
 import { SignUp } from './components/SignUp';
 import { ItemDetails } from './components/ItemDetails';
 import { SellIdea } from './components/SellIdea';
+import { Profile } from './components/Profile';
 import { bringToLife } from './services/gemini';
 import { supabase } from './services/supabase';
 import { ArrowRightIcon } from '@heroicons/react/24/solid';
 import { User } from '@supabase/supabase-js';
 
-type Page = 'home' | 'marketplace' | 'solutions' | 'login' | 'signup' | 'item-details' | 'sell-idea';
+type Page = 'home' | 'marketplace' | 'solutions' | 'login' | 'signup' | 'item-details' | 'sell-idea' | 'profile';
 
 const App: React.FC = () => {
   const [activeCreation, setActiveCreation] = useState<Creation | null>(null);
@@ -29,19 +30,35 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<Creation[]>([]);
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [selectedItem, setSelectedItem] = useState<MarketplaceView | null>(null);
+  const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     // Check active session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+      if (session?.user) {
+        setUser(session.user);
+        // Ensure user_info exists in public schema
+        import('./services/database').then(({ ensureUserInfoExists }) => {
+          ensureUserInfoExists(session.user);
+        });
+      } else {
+        setUser(null);
+      }
     });
 
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+
+      if (currentUser) {
+        // Ensure user_info exists whenever a user is authenticated
+        const { ensureUserInfoExists } = await import('./services/database');
+        await ensureUserInfoExists(currentUser);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -154,8 +171,18 @@ const App: React.FC = () => {
     setActiveCreation(creation);
   };
 
+  const handleNavigate = (page: string, ideaId?: string) => {
+    if (page === 'item-details' && ideaId) {
+      setSelectedIdeaId(ideaId);
+      setCurrentPage('item-details');
+    } else {
+      setCurrentPage(page as Page);
+    }
+  };
+
   const handleMarketplaceItemClick = (item: MarketplaceView) => {
     setSelectedItem(item);
+    setSelectedIdeaId(item.idea_id);
     setCurrentPage('item-details');
   };
 
@@ -167,7 +194,7 @@ const App: React.FC = () => {
       {/* Navigation Bar */}
       <NavBar
         isFocused={isFocused}
-        currentPage={currentPage === 'item-details' || currentPage === 'sell-idea' ? 'marketplace' : currentPage}
+        currentPage={currentPage === 'item-details' || currentPage === 'sell-idea' || currentPage === 'profile' ? 'marketplace' : currentPage}
         onNavigate={setCurrentPage}
         user={user}
         onLogout={handleLogout}
@@ -227,12 +254,16 @@ const App: React.FC = () => {
             />
           )}
 
-          {currentPage === 'item-details' && selectedItem && (
-            <ItemDetails item={selectedItem} onBack={() => setCurrentPage('marketplace')} />
+          {currentPage === 'item-details' && selectedIdeaId && (
+            <ItemDetails ideaId={selectedIdeaId} onBack={() => setCurrentPage('marketplace')} />
           )}
 
           {currentPage === 'sell-idea' && (
             <SellIdea onBack={() => setCurrentPage('marketplace')} />
+          )}
+
+          {currentPage === 'profile' && (
+            <Profile onNavigate={handleNavigate} />
           )}
 
           {currentPage === 'solutions' && (

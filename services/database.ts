@@ -410,8 +410,18 @@ export async function uploadDocument(
     folder: 'documents' | 'mvp-images' | 'mvp-videos' | 'profile-pictures' = 'documents'
 ): Promise<{ data: { path: string; url: string } | null; error: any }> {
     try {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${userId}/${Date.now()}.${fileExt}`;
+        let fileExt = file.name.split('.').pop();
+        // If extension is missing or same as name (no dot), try to infer from type
+        if (!fileExt || fileExt === file.name) {
+            const type = file.type;
+            if (type === 'image/jpeg') fileExt = 'jpg';
+            else if (type === 'image/png') fileExt = 'png';
+            else if (type === 'application/pdf') fileExt = 'pdf';
+            else fileExt = 'bin';
+        }
+
+        // Sanitize filename
+        const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
         const filePath = `${folder}/${fileName}`;
 
         const { data, error } = await supabase.storage
@@ -422,6 +432,7 @@ export async function uploadDocument(
             });
 
         if (error) {
+            console.error("Supabase Storage Upload Error:", error);
             return { data: null, error };
         }
 
@@ -438,6 +449,7 @@ export async function uploadDocument(
             error: null
         };
     } catch (error) {
+        console.error("Upload Document Exception:", error);
         return { data: null, error };
     }
 }
@@ -507,4 +519,159 @@ export async function getIdeaDetails(ideaId: string): Promise<{ data: IdeaDetail
         .eq('idea_id', ideaId)
         .single();
     return { data, error };
+}
+
+// ============================================
+// LIKES AND SAVES OPERATIONS
+// ============================================
+
+export async function toggleLike(ideaId: string, userId: string): Promise<{ liked: boolean; count: number; error: any }> {
+    try {
+        // 1. Check if like exists
+        const { data: existingLike } = await supabase
+            .from('likes')
+            .select('like_id')
+            .eq('idea_id', ideaId)
+            .eq('user_id', userId)
+            .single();
+
+        let liked = false;
+
+        if (existingLike) {
+            // Unlike
+            await supabase.from('likes').delete().eq('like_id', existingLike.like_id);
+            liked = false;
+        } else {
+            // Like
+            await supabase.from('likes').insert([{ idea_id: ideaId, user_id: userId }]);
+            liked = true;
+        }
+
+        // Get new count
+        const { count } = await supabase
+            .from('likes')
+            .select('like_id', { count: 'exact', head: true })
+            .eq('idea_id', ideaId);
+
+        return { liked, count: count || 0, error: null };
+    } catch (error) {
+        return { liked: false, count: 0, error };
+    }
+}
+
+export async function getLikeStatus(ideaId: string, userId?: string): Promise<{ liked: boolean; count: number; error: any }> {
+    try {
+        let liked = false;
+        if (userId) {
+            const { data } = await supabase
+                .from('likes')
+                .select('like_id')
+                .eq('idea_id', ideaId)
+                .eq('user_id', userId)
+                .single();
+            liked = !!data;
+        }
+
+        const { count } = await supabase
+            .from('likes')
+            .select('like_id', { count: 'exact', head: true })
+            .eq('idea_id', ideaId);
+
+        return { liked, count: count || 0, error: null };
+    } catch (error) {
+        return { liked: false, count: 0, error };
+    }
+}
+
+export async function toggleSave(ideaId: string, userId: string): Promise<{ saved: boolean; error: any }> {
+    try {
+        // 1. Check if save exists
+        const { data: existingSave } = await supabase
+            .from('saves')
+            .select('save_id')
+            .eq('idea_id', ideaId)
+            .eq('user_id', userId)
+            .single();
+
+        let saved = false;
+
+        if (existingSave) {
+            // Unsave
+            await supabase.from('saves').delete().eq('save_id', existingSave.save_id);
+            saved = false;
+        } else {
+            // Save
+            await supabase.from('saves').insert([{ idea_id: ideaId, user_id: userId }]);
+            saved = true;
+        }
+
+        return { saved, error: null };
+    } catch (error) {
+        return { saved: false, error };
+    }
+}
+
+export async function getSaveStatus(ideaId: string, userId: string): Promise<{ saved: boolean; error: any }> {
+    try {
+        const { data } = await supabase
+            .from('saves')
+            .select('save_id')
+            .eq('idea_id', ideaId)
+            .eq('user_id', userId)
+            .single();
+
+        return { saved: !!data, error: null };
+    } catch (error) {
+        return { saved: false, error };
+    }
+}
+
+export async function getUserLikedListings(userId: string): Promise<{ data: MarketplaceView[] | null; error: any }> {
+    try {
+        // Get liked idea IDs
+        const { data: likes } = await supabase
+            .from('likes')
+            .select('idea_id')
+            .eq('user_id', userId);
+
+        if (!likes || likes.length === 0) return { data: [], error: null };
+
+        const ideaIds = likes.map(l => l.idea_id);
+
+        // Fetch details from marketplace view
+        const { data, error } = await supabase
+            .from('marketplace')
+            .select('*')
+            .in('idea_id', ideaIds)
+            .order('created_at', { ascending: false });
+
+        return { data, error };
+    } catch (error) {
+        return { data: null, error };
+    }
+}
+
+export async function getUserSavedListings(userId: string): Promise<{ data: MarketplaceView[] | null; error: any }> {
+    try {
+        // Get saved idea IDs
+        const { data: saves } = await supabase
+            .from('saves')
+            .select('idea_id')
+            .eq('user_id', userId);
+
+        if (!saves || saves.length === 0) return { data: [], error: null };
+
+        const ideaIds = saves.map(s => s.idea_id);
+
+        // Fetch details from marketplace view
+        const { data, error } = await supabase
+            .from('marketplace')
+            .select('*')
+            .in('idea_id', ideaIds)
+            .order('created_at', { ascending: false });
+
+        return { data, error };
+    } catch (error) {
+        return { data: null, error };
+    }
 }

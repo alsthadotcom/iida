@@ -2,15 +2,15 @@ import React, { useState, useRef, useEffect } from 'react';
 import { User } from '@supabase/supabase-js';
 import { UserCircleIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 
-type Page = 'home' | 'marketplace' | 'solutions' | 'login' | 'signup' | 'item-details' | 'sell-idea';
-
 interface NavBarProps {
   currentPage?: string;
   user: User | null;
   onLogout?: () => void;
+  onNavigate: (page: any) => void;
+  isFocused?: boolean; // Add isFocused to props
 }
 
-export const NavBar: React.FC<NavBarProps> = ({ currentPage, user, onLogout }) => {
+export const NavBar: React.FC<NavBarProps> = ({ currentPage, user, onLogout, onNavigate }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -42,36 +42,34 @@ export const NavBar: React.FC<NavBarProps> = ({ currentPage, user, onLogout }) =
       `}
     >
       {/* Left: Handwritten Logo */}
-      <a href="/index.html" className="flex items-center select-none w-32">
+      <button onClick={() => onNavigate('home')} className="flex items-center select-none w-32 focus:outline-none">
         <span className="text-4xl text-white font-handwritten font-bold tracking-tight pb-1 hover:text-green-400 transition-colors cursor-pointer">
           ida.
         </span>
-      </a>
+      </button>
 
       {/* Center: Main Navigation Links */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden md:flex items-center space-x-10">
-        {currentPage && (
-          <>
-            <a
-              href="/pages/marketplace.html"
-              className={`relative tracking-wide transition-all duration-300 ${currentPage === 'marketplace' ? 'text-green-400 font-medium text-base' : 'text-zinc-500 hover:text-zinc-300 font-normal text-sm'}`}
-            >
-              Marketplace
-              {currentPage === 'marketplace' && (
-                <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-1 h-1 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.8)]"></span>
-              )}
-            </a>
-            <a
-              href="/pages/solutions.html"
-              className={`relative tracking-wide transition-all duration-300 ${currentPage === 'solutions' ? 'text-green-400 font-medium text-base' : 'text-zinc-500 hover:text-zinc-300 font-normal text-sm'}`}
-            >
-              Digital Solutions
-              {currentPage === 'solutions' && (
-                <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-1 h-1 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.8)]"></span>
-              )}
-            </a>
-          </>
-        )}
+        <>
+          <button
+            onClick={() => onNavigate('marketplace')}
+            className={`relative tracking-wide transition-all duration-300 ${currentPage === 'marketplace' ? 'text-green-400 font-medium text-base' : 'text-zinc-500 hover:text-zinc-300 font-normal text-sm'}`}
+          >
+            Marketplace
+            {currentPage === 'marketplace' && (
+              <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-1 h-1 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.8)]"></span>
+            )}
+          </button>
+          <button
+            onClick={() => onNavigate('solutions')}
+            className={`relative tracking-wide transition-all duration-300 ${currentPage === 'solutions' ? 'text-green-400 font-medium text-base' : 'text-zinc-500 hover:text-zinc-300 font-normal text-sm'}`}
+          >
+            Digital Solutions
+            {currentPage === 'solutions' && (
+              <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-1 h-1 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.8)]"></span>
+            )}
+          </button>
+        </>
       </div>
 
       {/* Right: Actions */}
@@ -79,20 +77,20 @@ export const NavBar: React.FC<NavBarProps> = ({ currentPage, user, onLogout }) =
 
         {!user ? (
           <>
-            <a
-              href="/pages/sell.html"
+            <button
+              onClick={() => onNavigate('sell-idea')}
               className="group relative text-xs font-medium text-zinc-500 hover:text-green-400 transition-colors duration-300 uppercase tracking-wider hidden sm:block"
             >
               Start Selling
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-green-400 transition-all duration-300 ease-out group-hover:w-full"></span>
-            </a>
+            </button>
 
-            <a
-              href="/pages/login.html"
+            <button
+              onClick={() => onNavigate('login')}
               className="px-5 py-2 text-sm font-semibold text-black bg-white rounded-full hover:bg-zinc-200 transition-colors shadow-lg shadow-white/5 whitespace-nowrap"
             >
               Log in
-            </a>
+            </button>
           </>
         ) : (
           <div className="relative" ref={dropdownRef}>
@@ -117,7 +115,7 @@ export const NavBar: React.FC<NavBarProps> = ({ currentPage, user, onLogout }) =
                 <div className="py-2">
                   <button
                     onClick={() => {
-                      window.location.href = '/pages/profile.html';
+                      onNavigate('profile');
                       setIsDropdownOpen(false);
                     }}
                     className="w-full px-4 py-2.5 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors flex items-center gap-3"
@@ -130,7 +128,8 @@ export const NavBar: React.FC<NavBarProps> = ({ currentPage, user, onLogout }) =
 
                   <button
                     onClick={() => {
-                      window.location.href = '/pages/dashboard.html';
+                      // Dashboard logic here if separate
+                      onNavigate('profile');
                       setIsDropdownOpen(false);
                     }}
                     className="w-full px-4 py-2.5 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors flex items-center gap-3"

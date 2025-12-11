@@ -3,9 +3,9 @@ import ReactDOM from 'react-dom/client';
 import { NavBar } from '../../components/NavBar';
 import { useAuthUser } from '../hooks/useAuthUser';
 import { supabase } from '../../services/supabase';
-import { getUserInfoById, updateUserUsername, updateUserProfilePicture, uploadDocument } from '../../services/database';
-import type { UserInfo } from '../../types/database';
-import { EnvelopeIcon, CameraIcon } from '@heroicons/react/24/outline';
+import { getUserInfoById, updateUserUsername, updateUserProfilePicture, uploadDocument, getUserLikedListings, getUserSavedListings } from '../../services/database';
+import type { UserInfo, MarketplaceView } from '../../types/database';
+import { EnvelopeIcon, CameraIcon, HeartIcon, BookmarkIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import '../../index.css';
 
 const ProfilePage = () => {
@@ -17,6 +17,10 @@ const ProfilePage = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isUploadingPicture, setIsUploadingPicture] = useState(false);
     const profilePictureInputRef = React.useRef<HTMLInputElement>(null);
+
+    // Likes & Saves
+    const [likedIdeas, setLikedIdeas] = useState<MarketplaceView[]>([]);
+    const [savedIdeas, setSavedIdeas] = useState<MarketplaceView[]>([]);
 
     // Fetch user info from database
     useEffect(() => {
@@ -45,6 +49,13 @@ const ProfilePage = () => {
             setUserInfo(data);
             setEditUsername(data.username);
         }
+
+        // Load liked and saved ideas
+        const { data: likes } = await getUserLikedListings(user.id);
+        const { data: saves } = await getUserSavedListings(user.id);
+        setLikedIdeas(likes || []);
+        setSavedIdeas(saves || []);
+
         setIsLoading(false);
     };
 
@@ -265,6 +276,108 @@ const ProfilePage = () => {
                         </button>
                     </div>
 
+                </div>
+
+                {/* Liked Ideas Section */}
+                <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-8 mt-8">
+                    <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                        <HeartIcon className="w-5 h-5 text-pink-500" />
+                        Liked Ideas ({likedIdeas.length})
+                    </h2>
+
+                    {likedIdeas.length === 0 ? (
+                        <p className="text-zinc-500 text-sm italic">You haven't liked any ideas yet.</p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="border-b border-white/10 text-zinc-400 text-sm">
+                                        <th className="pb-3 pl-2">Title</th>
+                                        <th className="pb-3">Category</th>
+                                        <th className="pb-3">Price</th>
+                                        <th className="pb-3">AI Score</th>
+                                        <th className="pb-3"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                    {likedIdeas.map(item => (
+                                        <tr key={item.idea_id} className="group hover:bg-white/5 transition-colors">
+                                            <td className="py-4 pl-2 font-medium text-white">{item.title}</td>
+                                            <td className="py-4 text-zinc-400 text-sm">{item.category || 'N/A'}</td>
+                                            <td className="py-4 text-green-400 font-mono">${item.price.toLocaleString()}</td>
+                                            <td className="py-4">
+                                                <div className="flex items-center gap-1">
+                                                    <span className={`font-bold ${item.overall_score >= 7.5 ? 'text-green-500' : item.overall_score >= 5 ? 'text-yellow-500' : 'text-red-500'}`}>
+                                                        {item.overall_score.toFixed(1)}
+                                                    </span>
+                                                    <span className="text-xs text-zinc-600">/10</span>
+                                                </div>
+                                            </td>
+                                            <td className="py-4 text-right pr-2">
+                                                <a
+                                                    href={`/pages/details.html?id=${item.idea_id}`}
+                                                    className="text-zinc-500 hover:text-white transition-colors inline-block"
+                                                >
+                                                    <ArrowRightIcon className="w-5 h-5" />
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+
+                {/* Saved Ideas Section */}
+                <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-8 mt-8 mb-12">
+                    <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                        <BookmarkIcon className="w-5 h-5 text-blue-500" />
+                        Saved Ideas ({savedIdeas.length})
+                    </h2>
+
+                    {savedIdeas.length === 0 ? (
+                        <p className="text-zinc-500 text-sm italic">You haven't saved any ideas yet.</p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="border-b border-white/10 text-zinc-400 text-sm">
+                                        <th className="pb-3 pl-2">Title</th>
+                                        <th className="pb-3">Category</th>
+                                        <th className="pb-3">Price</th>
+                                        <th className="pb-3">AI Score</th>
+                                        <th className="pb-3"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                    {savedIdeas.map(item => (
+                                        <tr key={item.idea_id} className="group hover:bg-white/5 transition-colors">
+                                            <td className="py-4 pl-2 font-medium text-white">{item.title}</td>
+                                            <td className="py-4 text-zinc-400 text-sm">{item.category || 'N/A'}</td>
+                                            <td className="py-4 text-green-400 font-mono">${item.price.toLocaleString()}</td>
+                                            <td className="py-4">
+                                                <div className="flex items-center gap-1">
+                                                    <span className={`font-bold ${item.overall_score >= 7.5 ? 'text-green-500' : item.overall_score >= 5 ? 'text-yellow-500' : 'text-red-500'}`}>
+                                                        {item.overall_score.toFixed(1)}
+                                                    </span>
+                                                    <span className="text-xs text-zinc-600">/10</span>
+                                                </div>
+                                            </td>
+                                            <td className="py-4 text-right pr-2">
+                                                <a
+                                                    href={`/pages/details.html?id=${item.idea_id}`}
+                                                    className="text-zinc-500 hover:text-white transition-colors inline-block"
+                                                >
+                                                    <ArrowRightIcon className="w-5 h-5" />
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

@@ -1,12 +1,13 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
 import React, { useState, useEffect } from 'react';
-import { ArrowLeftIcon, CheckBadgeIcon, ChartBarIcon, DocumentTextIcon, ShieldCheckIcon, LinkIcon, DocumentCheckIcon, LockClosedIcon } from '@heroicons/react/24/outline';
-import { StarIcon } from '@heroicons/react/24/solid';
-import { getIdeaDetailById } from '../services/database';
+import {
+    ArrowLeftIcon, CheckBadgeIcon, ChartBarIcon, DocumentTextIcon, ShieldCheckIcon, LinkIcon, DocumentCheckIcon, LockClosedIcon,
+    HeartIcon, BookmarkIcon
+} from '@heroicons/react/24/outline';
+import { StarIcon, HeartIcon as HeartIconSolid, BookmarkIcon as BookmarkIconSolid } from '@heroicons/react/24/solid';
+import { getIdeaDetailById, getLikeStatus, toggleLike, getSaveStatus, toggleSave } from '../services/database';
+import { supabase } from '../services/supabase';
 import type { IdeaDetailView } from '../types/database';
+import { User } from '@supabase/supabase-js';
 
 interface ItemDetailsProps {
     ideaId: string;
@@ -18,9 +19,60 @@ export const ItemDetails: React.FC<ItemDetailsProps> = ({ ideaId, onBack }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // Likes & Saves
+    const [isLiked, setIsLiked] = useState(false);
+    const [likeCount, setLikeCount] = useState(0);
+    const [isSaved, setIsSaved] = useState(false);
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
+
     useEffect(() => {
         fetchIdeaDetails();
+        checkUserAndInteractions();
     }, [ideaId]);
+
+    const checkUserAndInteractions = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        setCurrentUser(user);
+        if (user) {
+            // Load saves only if logged in
+            const { saved } = await getSaveStatus(ideaId, user.id);
+            setIsSaved(saved);
+        }
+        // Load likes (public count, private status)
+        const { liked, count } = await getLikeStatus(ideaId, user?.id);
+        setIsLiked(liked);
+        setLikeCount(count);
+    };
+
+    const handleLike = async () => {
+        if (!currentUser) return alert('Please log in to like ideas.');
+
+        // Optimistic UI
+        const newLiked = !isLiked;
+        setIsLiked(newLiked);
+        setLikeCount(prev => newLiked ? prev + 1 : prev - 1);
+
+        const { error, count } = await toggleLike(ideaId, currentUser.id);
+        if (error) {
+            // Revert
+            setIsLiked(!newLiked);
+            setLikeCount(prev => newLiked ? prev - 1 : prev + 1);
+        } else {
+            setLikeCount(count); // Sync true count
+        }
+    };
+
+    const handleSave = async () => {
+        if (!currentUser) return alert('Please log in to save ideas.');
+
+        const newSaved = !isSaved;
+        setIsSaved(newSaved);
+
+        const { error } = await toggleSave(ideaId, currentUser.id);
+        if (error) {
+            setIsSaved(!newSaved);
+        }
+    };
 
     const fetchIdeaDetails = async () => {
         setLoading(true);
@@ -106,7 +158,6 @@ export const ItemDetails: React.FC<ItemDetailsProps> = ({ ideaId, onBack }) => {
 
                     {/* Title & Header Card */}
                     <div className="bg-zinc-900/50 backdrop-blur-xl border border-white/5 rounded-2xl p-8 shadow-lg">
-
                         <h1 className="text-3xl md:text-4xl font-bold text-white">{item.title}</h1>
                     </div>
 
@@ -190,8 +241,6 @@ export const ItemDetails: React.FC<ItemDetailsProps> = ({ ideaId, onBack }) => {
                                 </span>
                             </div>
 
-
-
                             {item.mvp_type === 'Physical' && (item.physical_mvp_image || item.physical_mvp_video) && (
                                 <div className="space-y-4">
                                     {item.physical_mvp_image && (
@@ -246,32 +295,30 @@ export const ItemDetails: React.FC<ItemDetailsProps> = ({ ideaId, onBack }) => {
 
                 {/* Right Column - Sticky Price Card */}
                 <div className="lg:col-span-1">
-                    <div className="sticky top-24 bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl">
-
-                        {/* Title (Mobile only, or generic?) -> Maybe 'Purchase' */}
+                    <div className="sticky top-24 bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl space-y-6">
 
                         {/* Price Display */}
-                        <div className="flex justify-between items-start mb-6">
+                        <div className="flex justify-between items-start">
                             <div>
                                 <div className="text-sm text-zinc-400 font-medium mb-1">Asking Price</div>
                                 <div key="price" className="text-4xl font-bold text-white tracking-tight">
                                     ${item.price.toLocaleString()}
                                 </div>
                             </div>
-                            <div className="text-xs text-zinc-500 font-mono lowercase bg-white/5 border border-white/5 px-2 py-1 rounded">
+                            <div className="text-xs text-zinc-500 font-mono lowercase bg-white/5 border border-white/5 px-2 py-1 rounded h-fit">
                                 @{item.username.replace(/^@/, '').toLowerCase()}
                             </div>
                         </div>
 
                         {item.mvp && (
-                            <div className="mb-6 inline-flex items-center gap-2 text-xs font-medium text-green-400 bg-green-500/10 border border-green-500/20 px-3 py-1.5 rounded-lg">
+                            <div className="inline-flex items-center gap-2 text-xs font-medium text-green-400 bg-green-500/10 border border-green-500/20 px-3 py-1.5 rounded-lg">
                                 <CheckBadgeIcon className="w-4 h-4" />
                                 <span>MVP Available</span>
                             </div>
                         )}
 
                         {/* Rating Row */}
-                        <div className="flex items-center justify-between mb-8 p-3 bg-white/5 rounded-xl border border-white/5">
+                        <div className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
                             <div className="flex items-center gap-2">
                                 <div className="bg-yellow-500/10 p-1.5 rounded-lg">
                                     <StarIcon className="w-4 h-4 text-yellow-500" />
@@ -288,30 +335,68 @@ export const ItemDetails: React.FC<ItemDetailsProps> = ({ ideaId, onBack }) => {
                             </div>
                         </div>
 
-                        {/* CTA */}
-                        <button className="w-full bg-green-500 hover:bg-green-400 text-black font-bold text-lg py-4 rounded-xl transition-all shadow-[0_4px_20px_rgba(34,197,94,0.3)] hover:shadow-[0_6px_30px_rgba(34,197,94,0.4)] hover:-translate-y-0.5 mb-8">
-                            Contact Seller
-                        </button>
+                        {/* Main CTAs */}
+                        <div className="space-y-3 mb-6">
+                            <button className="w-full bg-white text-black hover:bg-zinc-200 font-bold text-lg py-3.5 rounded-xl transition-all shadow-lg">
+                                Buy Now
+                            </button>
+                            <button className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-semibold text-lg py-3.5 rounded-xl border border-white/10 transition-all shadow-lg">
+                                Contact Seller
+                            </button>
+                        </div>
+
+                        {/* Secondary Actions */}
+                        <div className="flex gap-3 mb-8">
+                            <button
+                                onClick={handleLike}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border transition-colors ${isLiked
+                                    ? 'bg-pink-500/10 border-pink-500/50 text-pink-500 hover:bg-pink-500/20'
+                                    : 'border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800'
+                                    }`}
+                            >
+                                {isLiked ? (
+                                    <HeartIconSolid className="w-5 h-5" />
+                                ) : (
+                                    <HeartIcon className="w-5 h-5" />
+                                )}
+                                <span className="text-sm font-medium">Like {likeCount > 0 && `(${likeCount})`}</span>
+                            </button>
+
+                            <button
+                                onClick={handleSave}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border transition-colors ${isSaved
+                                    ? 'bg-blue-500/10 border-blue-500/50 text-blue-500 hover:bg-blue-500/20'
+                                    : 'border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800'
+                                    }`}
+                            >
+                                {isSaved ? (
+                                    <BookmarkIconSolid className="w-5 h-5" />
+                                ) : (
+                                    <BookmarkIcon className="w-5 h-5" />
+                                )}
+                                <span className="text-sm font-medium">{isSaved ? 'Saved' : 'Save'}</span>
+                            </button>
+                        </div>
 
                         {/* Trust Badges */}
-                        <div className="space-y-4 pt-6 border-t border-white/10">
-                            <div className="flex items-center gap-3 group cursor-help">
-                                <div className="p-2 bg-blue-500/10 rounded-full group-hover:bg-blue-500/20 transition-colors">
-                                    <CheckBadgeIcon className="w-5 h-5 text-blue-400" />
+                        <div className="space-y-4 pt-6 border-t border-zinc-800">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-green-500/10 rounded-full">
+                                    <ShieldCheckIcon className="w-5 h-5 text-green-400" />
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-sm font-medium text-white group-hover:text-blue-300 transition-colors">Verified Seller</span>
-                                    <span className="text-xs text-zinc-500">Identity confirmed via Stripe</span>
+                                    <span className="text-sm font-bold text-white">Verified Listing</span>
+                                    <span className="text-xs text-zinc-500 leading-tight">Audited by Ida's AI & verified ownership.</span>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-3 group cursor-help">
-                                <div className="p-2 bg-purple-500/10 rounded-full group-hover:bg-purple-500/20 transition-colors">
-                                    <DocumentCheckIcon className="w-5 h-5 text-purple-400" />
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-500/10 rounded-full">
+                                    <DocumentCheckIcon className="w-5 h-5 text-blue-400" />
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-sm font-medium text-white group-hover:text-purple-300 transition-colors">Documents Signed</span>
-                                    <span className="text-xs text-zinc-500">IP assignment ready</span>
+                                    <span className="text-sm font-bold text-white">Smart Contract</span>
+                                    <span className="text-xs text-zinc-500 leading-tight">Ownership transfer via secure escrow.</span>
                                 </div>
                             </div>
                         </div>
