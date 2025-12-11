@@ -9,16 +9,17 @@ DROP POLICY IF EXISTS "Public can view listings" ON idea_listing;
 CREATE POLICY "Public can view listings" ON idea_listing FOR SELECT TO public USING (true);
 
 -- Allow users to insert their own listings
+-- CAST auth.uid() to text to match user_id column type
 DROP POLICY IF EXISTS "Users can insert own listings" ON idea_listing;
-CREATE POLICY "Users can insert own listings" ON idea_listing FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can insert own listings" ON idea_listing FOR INSERT TO authenticated WITH CHECK (auth.uid()::text = user_id);
 
 -- Allow users to update their own listings
 DROP POLICY IF EXISTS "Users can update own listings" ON idea_listing;
-CREATE POLICY "Users can update own listings" ON idea_listing FOR UPDATE TO authenticated USING (auth.uid() = user_id);
+CREATE POLICY "Users can update own listings" ON idea_listing FOR UPDATE TO authenticated USING (auth.uid()::text = user_id);
 
 -- Allow users to delete their own listings
 DROP POLICY IF EXISTS "Users can delete own listings" ON idea_listing;
-CREATE POLICY "Users can delete own listings" ON idea_listing FOR DELETE TO authenticated USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own listings" ON idea_listing FOR DELETE TO authenticated USING (auth.uid()::text = user_id);
 
 
 -- 2. Policies for 'ai_scoring'
