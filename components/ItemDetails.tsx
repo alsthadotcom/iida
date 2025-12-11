@@ -4,7 +4,7 @@ import {
     HeartIcon, BookmarkIcon, ShareIcon, ClipboardDocumentIcon, XMarkIcon, CheckIcon
 } from '@heroicons/react/24/outline';
 import { StarIcon, HeartIcon as HeartIconSolid, BookmarkIcon as BookmarkIconSolid } from '@heroicons/react/24/solid';
-import { getIdeaDetailById, getLikeStatus, toggleLike, getSaveStatus, toggleSave } from '../services/database';
+import { getIdeaDetailById, getLikeStatus, toggleLike, getSaveStatus, toggleSave, getShareCount, trackShare } from '../services/database';
 import { supabase } from '../services/supabase';
 import type { IdeaDetailView } from '../types/database';
 import { User } from '@supabase/supabase-js';
@@ -18,8 +18,7 @@ export const ItemDetails: React.FC<ItemDetailsProps> = ({ ideaId, onBack }) => {
     const [item, setItem] = useState<IdeaDetailView | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-
-    // Likes & Saves
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [isLiked, setIsLiked] = useState(false);
     const [likeCount, setLikeCount] = useState(0);
     const [isSaved, setIsSaved] = useState(false);
@@ -27,37 +26,61 @@ export const ItemDetails: React.FC<ItemDetailsProps> = ({ ideaId, onBack }) => {
     // Share Modal State
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [shareCount, setShareCount] = useState(0);
 
-    const handleCopyLink = () => {
+    useEffect(() => {
+        const fetchDetails = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                // Fetch Item
+                const { data, error: fetchError } = await getIdeaDetailById(ideaId);
+                if (fetchError) throw fetchError;
+                if (!data) throw new Error('Idea not found');
+                setItem(data);
+
+                // Fetch Share Count
+                const count = await getShareCount(ideaId);
+                setShareCount(count);
+
+                // Auth & Social State
+                const { data: { user } } = await supabase.auth.getUser();
+                setCurrentUser(user);
+
+                if (user) {
+                    const likeStatus = await getLikeStatus(ideaId, user.id);
+                    setIsLiked(likeStatus.liked);
+
+                    const saveStatus = await getSaveStatus(ideaId, user.id);
+                    setIsSaved(saveStatus.saved);
+                }
+                const likeStatus = await getLikeStatus(ideaId);
+                setLikeCount(likeStatus.count);
+
+            } catch (err: any) {
+                setError(err.message || 'Failed to load idea details');
+                console.error('Fetch error:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchDetails();
+    }, [ideaId]);
+
+    const handleCopyLink = async () => {
         navigator.clipboard.writeText(window.location.href);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-    };
-    const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-    useEffect(() => {
-        fetchIdeaDetails();
-        checkUserAndInteractions();
-    }, [ideaId]);
-
-    const checkUserAndInteractions = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        setCurrentUser(user);
-        if (user) {
-            // Load saves only if logged in
-            const { saved } = await getSaveStatus(ideaId, user.id);
-            setIsSaved(saved);
-        }
-        // Load likes (public count, private status)
-        const { liked, count } = await getLikeStatus(ideaId, user?.id);
-        setIsLiked(liked);
-        setLikeCount(count);
+        // Track share
+        await trackShare(ideaId, currentUser?.id);
+        setShareCount(prev => prev + 1);
     };
 
     const handleLike = async () => {
         if (!currentUser) return alert('Please log in to like ideas.');
-
-        // Optimistic UI
+        // Optimistic UI interaction
         const newLiked = !isLiked;
         setIsLiked(newLiked);
         setLikeCount(prev => newLiked ? prev + 1 : prev - 1);
@@ -68,36 +91,14 @@ export const ItemDetails: React.FC<ItemDetailsProps> = ({ ideaId, onBack }) => {
             setIsLiked(!newLiked);
             setLikeCount(prev => newLiked ? prev - 1 : prev + 1);
         } else {
-            setLikeCount(count); // Sync true count
+            setLikeCount(count);
         }
     };
 
     const handleSave = async () => {
-        if (!currentUser) return alert('Please log in to save ideas.');
-
-        const newSaved = !isSaved;
-        setIsSaved(newSaved);
-
-        const { error } = await toggleSave(ideaId, currentUser.id);
-        if (error) {
-            setIsSaved(!newSaved);
-        }
-    };
-
-    const fetchIdeaDetails = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const { data, error: fetchError } = await getIdeaDetailById(ideaId);
-            if (fetchError) throw fetchError;
-            if (!data) throw new Error('Idea not found');
-            setItem(data);
-        } catch (err: any) {
-            setError(err.message || 'Failed to load idea details');
-            console.error('Fetch error:', err);
-        } finally {
-            setLoading(false);
-        }
+        if (!currentUser) return alert('Please log in to save items');
+        const { saved } = await toggleSave(ideaId, currentUser.id);
+        setIsSaved(saved);
     };
 
     if (loading) {
@@ -212,42 +213,42 @@ export const ItemDetails: React.FC<ItemDetailsProps> = ({ ideaId, onBack }) => {
                         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                             <div className="bg-zinc-950/50 border border-zinc-800 rounded-lg p-4">
                                 <div className="text-xs text-zinc-500 uppercase mb-2">Uniqueness</div>
-                                <div className={`text-2xl md:text-3xl font-bold ${getScoreColor(item.uniqueness)}`}>
+                                <div className={`text - 2xl md: text - 3xl font - bold ${getScoreColor(item.uniqueness)} `}>
                                     {item.uniqueness}
                                 </div>
                                 <div className="text-xs text-zinc-600 mt-1">out of 100</div>
                             </div>
                             <div className="bg-zinc-900/40 border border-zinc-800 rounded-lg p-4">
                                 <div className="text-xs text-zinc-500 uppercase mb-2">Demand</div>
-                                <div className={`text-xl md:text-2xl font-bold ${getDemandColor(item.demand)}`}>
+                                <div className={`text-xl md:text-2xl font - bold ${getDemandColor(item.demand)} `}>
                                     {item.demand}
                                 </div>
                                 <div className="text-xs text-zinc-600 mt-1">Market</div>
                             </div>
                             <div className="bg-zinc-950/50 border border-zinc-800 rounded-lg p-4">
                                 <div className="text-xs text-zinc-500 uppercase mb-2">Impact</div>
-                                <div className={`text-2xl md:text-3xl font-bold ${getScoreColor(item.problem_impact)}`}>
+                                <div className={`text - 2xl md: text - 3xl font - bold ${getScoreColor(item.problem_impact)} `}>
                                     {item.problem_impact}
                                 </div>
                                 <div className="text-xs text-zinc-600 mt-1">out of 100</div>
                             </div>
                             <div className="bg-zinc-950/50 border border-zinc-800 rounded-lg p-4">
                                 <div className="text-xs text-zinc-500 uppercase mb-2">Viability</div>
-                                <div className={`text-2xl md:text-3xl font-bold ${getScoreColor(item.viability)}`}>
+                                <div className={`text-2xl md:text-3xl font-bold ${getScoreColor(item.viability)} `}>
                                     {item.viability}
                                 </div>
                                 <div className="text-xs text-zinc-600 mt-1">out of 100</div>
                             </div>
                             <div className="bg-zinc-950/50 border border-zinc-800 rounded-lg p-4">
                                 <div className="text-xs text-zinc-500 uppercase mb-2">Scalability</div>
-                                <div className={`text-2xl md:text-3xl font-bold ${getScoreColor(item.scalability)}`}>
+                                <div className={`text-2xl md:text-3xl font-bold ${getScoreColor(item.scalability)} `}>
                                     {item.scalability}
                                 </div>
                                 <div className="text-xs text-zinc-600 mt-1">out of 100</div>
                             </div>
                             <div className="bg-zinc-950/50 border border-zinc-800 rounded-lg p-4 col-span-2 lg:col-span-1">
                                 <div className="text-xs text-zinc-500 uppercase mb-2">Overall</div>
-                                <div className={`text-2xl md:text-3xl font-bold ${getScoreColor(item.overall_score)}`}>
+                                <div className={`text-2xl md:text-3xl font-bold ${getScoreColor(item.overall_score)} `}>
                                     {item.overall_score.toFixed(1)}
                                 </div>
                                 <div className="text-xs text-zinc-600 mt-1">Average</div>
@@ -385,10 +386,10 @@ export const ItemDetails: React.FC<ItemDetailsProps> = ({ ideaId, onBack }) => {
                         <div className="flex gap-3 mb-8">
                             <button
                                 onClick={handleLike}
-                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border transition-colors ${isLiked
+                                className={`flex - 1 flex items - center justify - center gap - 2 py - 2.5 rounded - lg border transition - colors ${isLiked
                                     ? 'bg-pink-500/10 border-pink-500/50 text-pink-500 hover:bg-pink-500/20'
                                     : 'border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800'
-                                    }`}
+                                    } `}
                             >
                                 {isLiked ? (
                                     <HeartIconSolid className="w-5 h-5" />
@@ -403,7 +404,7 @@ export const ItemDetails: React.FC<ItemDetailsProps> = ({ ideaId, onBack }) => {
                                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border transition-colors ${isSaved
                                     ? 'bg-blue-500/10 border-blue-500/50 text-blue-500 hover:bg-blue-500/20'
                                     : 'border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800'
-                                    }`}
+                                    } `}
                             >
                                 {isSaved ? (
                                     <BookmarkIconSolid className="w-5 h-5" />
@@ -418,7 +419,7 @@ export const ItemDetails: React.FC<ItemDetailsProps> = ({ ideaId, onBack }) => {
                                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 transition-colors"
                             >
                                 <ShareIcon className="w-5 h-5" />
-                                <span className="text-sm font-medium">Share</span>
+                                <span className="text-sm font-medium">Share {shareCount > 0 && `(${shareCount})`}</span>
                             </button>
                         </div>
 
@@ -483,9 +484,9 @@ export const ItemDetails: React.FC<ItemDetailsProps> = ({ ideaId, onBack }) => {
                             <button
                                 onClick={handleCopyLink}
                                 className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold transition-all ${copied
-                                        ? 'bg-green-500 text-black'
-                                        : 'bg-white text-black hover:bg-zinc-200'
-                                    }`}
+                                    ? 'bg-green-500 text-black'
+                                    : 'bg-white text-black hover:bg-zinc-200'
+                                    } `}
                             >
                                 {copied ? (
                                     <>

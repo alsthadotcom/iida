@@ -727,3 +727,21 @@ export async function getUserSavedListings(userId: string): Promise<{ data: Mark
         return { data: null, error };
     }
 }
+
+export async function getShareCount(ideaId: string): Promise<number> {
+    const { count } = await supabase
+        .from('shares')
+        .select('id', { count: 'exact', head: true })
+        .eq('idea_id', ideaId);
+    return count || 0;
+}
+
+export async function trackShare(ideaId: string, userId?: string): Promise<void> {
+    const { error } = await supabase.from('shares').insert([
+        {
+            idea_id: ideaId,
+            user_id: userId || null
+        }
+    ]);
+    if (error) console.error("Error tracking share:", error);
+}
