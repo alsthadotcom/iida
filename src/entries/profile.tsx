@@ -35,6 +35,9 @@ const ProfilePage = () => {
     // View Mode
     const [isPublicView, setIsPublicView] = useState(false);
     const [showSecurityModal, setShowSecurityModal] = useState(false);
+    const [showSellingModal, setShowSellingModal] = useState(false);
+    const [showLikedModal, setShowLikedModal] = useState(false);
+    const [showSavedModal, setShowSavedModal] = useState(false);
 
     // Fetch user info from database
     // Fetch user info from database
@@ -398,148 +401,47 @@ const ProfilePage = () => {
 
                 </div>
 
-                {/* Selling Ideas Section */}
-                <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-8 mt-8">
-                    <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                        <ShoppingBagIcon className="w-5 h-5 text-green-500" />
-                        Selling Listings ({sellingIdeas.length})
-                    </h2>
-
-                    {sellingIdeas.length === 0 ? (
-                        <p className="text-zinc-500 text-sm italic">No listings found.</p>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left">
-                                <thead>
-                                    <tr className="border-b border-white/10 text-zinc-400 text-sm">
-                                        <th className="pb-3 pl-2">Title</th>
-                                        <th className="pb-3">Price</th>
-                                        <th className="pb-3 text-right pr-2">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="text-sm divide-y divide-white/5">
-                                    {sellingIdeas.map(item => (
-                                        <tr key={item.idea_id} className="group hover:bg-white/5 transition-colors">
-                                            <td className="py-4 pl-2 font-medium text-white">{item.title}</td>
-                                            <td className="py-4 text-green-400 font-mono">${item.price.toLocaleString()}</td>
-                                            <td className="py-4 text-right pr-2">
-                                                <a href={`/pages/details.html?id=${item.idea_id}`} className="text-zinc-500 hover:text-white transition-colors inline-block">
-                                                    <ArrowRightIcon className="w-5 h-5" />
-                                                </a>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                {/* Action Buttons for Lists */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+                    <button
+                        onClick={() => setShowSellingModal(true)}
+                        className="bg-[#09090b] border border-zinc-800 p-6 rounded-xl hover:bg-zinc-900 transition-all text-left group"
+                    >
+                        <div className="flex items-center justify-between mb-2">
+                            <ShoppingBagIcon className="w-6 h-6 text-green-500" />
+                            <span className="text-2xl font-bold text-white">{sellingIdeas.length}</span>
                         </div>
+                        <h3 className="font-semibold text-zinc-300 group-hover:text-white transition-colors">Selling Listings</h3>
+                    </button>
+
+                    {!isPublicView && (
+                        <>
+                            <button
+                                onClick={() => setShowLikedModal(true)}
+                                className="bg-[#09090b] border border-zinc-800 p-6 rounded-xl hover:bg-zinc-900 transition-all text-left group"
+                            >
+                                <div className="flex items-center justify-between mb-2">
+                                    <HeartIcon className="w-6 h-6 text-pink-500" />
+                                    <span className="text-2xl font-bold text-white">{likedIdeas.length}</span>
+                                </div>
+                                <h3 className="font-semibold text-zinc-300 group-hover:text-white transition-colors">Liked Ideas</h3>
+                            </button>
+
+                            <button
+                                onClick={() => setShowSavedModal(true)}
+                                className="bg-[#09090b] border border-zinc-800 p-6 rounded-xl hover:bg-zinc-900 transition-all text-left group"
+                            >
+                                <div className="flex items-center justify-between mb-2">
+                                    <BookmarkIcon className="w-6 h-6 text-blue-500" />
+                                    <span className="text-2xl font-bold text-white">{savedIdeas.length}</span>
+                                </div>
+                                <h3 className="font-semibold text-zinc-300 group-hover:text-white transition-colors">Saved Ideas</h3>
+                            </button>
+                        </>
                     )}
                 </div>
 
-                {!isPublicView && (
-                    <>
-                        {/* Liked Ideas Section */}
-                        <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-8 mt-8">
-                            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                                <HeartIcon className="w-5 h-5 text-pink-500" />
-                                Liked Ideas ({likedIdeas.length})
-                            </h2>
 
-                            {likedIdeas.length === 0 ? (
-                                <p className="text-zinc-500 text-sm italic">You haven't liked any ideas yet.</p>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left">
-                                        <thead>
-                                            <tr className="border-b border-white/10 text-zinc-400 text-sm">
-                                                <th className="pb-3 pl-2">Title</th>
-                                                <th className="pb-3">Category</th>
-                                                <th className="pb-3">Price</th>
-                                                <th className="pb-3">AI Score</th>
-                                                <th className="pb-3"></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-white/5">
-                                            {likedIdeas.map(item => (
-                                                <tr key={item.idea_id} className="group hover:bg-white/5 transition-colors">
-                                                    <td className="py-4 pl-2 font-medium text-white">{item.title}</td>
-                                                    <td className="py-4 text-zinc-400 text-sm">{item.category || 'N/A'}</td>
-                                                    <td className="py-4 text-green-400 font-mono">${item.price.toLocaleString()}</td>
-                                                    <td className="py-4">
-                                                        <div className="flex items-center gap-1">
-                                                            <span className={`font-bold ${item.overall_score >= 7.5 ? 'text-green-500' : item.overall_score >= 5 ? 'text-yellow-500' : 'text-red-500'}`}>
-                                                                {item.overall_score.toFixed(1)}
-                                                            </span>
-                                                            <span className="text-xs text-zinc-600">/10</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="py-4 text-right pr-2">
-                                                        <a
-                                                            href={`/pages/details.html?id=${item.idea_id}`}
-                                                            className="text-zinc-500 hover:text-white transition-colors inline-block"
-                                                        >
-                                                            <ArrowRightIcon className="w-5 h-5" />
-                                                        </a>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Saved Ideas Section */}
-                        <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-8 mt-8 mb-12">
-                            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                                <BookmarkIcon className="w-5 h-5 text-blue-500" />
-                                Saved Ideas ({savedIdeas.length})
-                            </h2>
-
-                            {savedIdeas.length === 0 ? (
-                                <p className="text-zinc-500 text-sm italic">You haven't saved any ideas yet.</p>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left">
-                                        <thead>
-                                            <tr className="border-b border-white/10 text-zinc-400 text-sm">
-                                                <th className="pb-3 pl-2">Title</th>
-                                                <th className="pb-3">Category</th>
-                                                <th className="pb-3">Price</th>
-                                                <th className="pb-3">AI Score</th>
-                                                <th className="pb-3"></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-white/5">
-                                            {savedIdeas.map(item => (
-                                                <tr key={item.idea_id} className="group hover:bg-white/5 transition-colors">
-                                                    <td className="py-4 pl-2 font-medium text-white">{item.title}</td>
-                                                    <td className="py-4 text-zinc-400 text-sm">{item.category || 'N/A'}</td>
-                                                    <td className="py-4 text-green-400 font-mono">${item.price.toLocaleString()}</td>
-                                                    <td className="py-4">
-                                                        <div className="flex items-center gap-1">
-                                                            <span className={`font-bold ${item.overall_score >= 7.5 ? 'text-green-500' : item.overall_score >= 5 ? 'text-yellow-500' : 'text-red-500'}`}>
-                                                                {item.overall_score.toFixed(1)}
-                                                            </span>
-                                                            <span className="text-xs text-zinc-600">/10</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="py-4 text-right pr-2">
-                                                        <a
-                                                            href={`/pages/details.html?id=${item.idea_id}`}
-                                                            className="text-zinc-500 hover:text-white transition-colors inline-block"
-                                                        >
-                                                            <ArrowRightIcon className="w-5 h-5" />
-                                                        </a>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
-                    </>
-                )}
             </div>
             {/* Security Modal */}
             {showSecurityModal && (
@@ -607,6 +509,184 @@ const ProfilePage = () => {
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Selling Modal */}
+            {showSellingModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-8 max-w-4xl w-full relative shadow-2xl animate-in zoom-in-95 duration-200 max-h-[80vh] overflow-y-auto">
+                        <button
+                            onClick={() => setShowSellingModal(false)}
+                            className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+
+                        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                            <ShoppingBagIcon className="w-5 h-5 text-green-500" />
+                            Selling Listings ({sellingIdeas.length})
+                        </h2>
+
+                        {sellingIdeas.length === 0 ? (
+                            <p className="text-zinc-500 text-sm italic">No listings found.</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="border-b border-white/10 text-zinc-400 text-sm">
+                                            <th className="pb-3 pl-2">Title</th>
+                                            <th className="pb-3">Price</th>
+                                            <th className="pb-3 text-right pr-2">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="text-sm divide-y divide-white/5">
+                                        {sellingIdeas.map(item => (
+                                            <tr key={item.idea_id} className="group hover:bg-white/5 transition-colors">
+                                                <td className="py-4 pl-2 font-medium text-white">{item.title}</td>
+                                                <td className="py-4 text-green-400 font-mono">${item.price.toLocaleString()}</td>
+                                                <td className="py-4 text-right pr-2">
+                                                    <a href={`/pages/details.html?id=${item.idea_id}`} className="text-zinc-500 hover:text-white transition-colors inline-block">
+                                                        <ArrowRightIcon className="w-5 h-5" />
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Liked Modal */}
+            {showLikedModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-8 max-w-5xl w-full relative shadow-2xl animate-in zoom-in-95 duration-200 max-h-[80vh] overflow-y-auto">
+                        <button
+                            onClick={() => setShowLikedModal(false)}
+                            className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+
+                        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                            <HeartIcon className="w-5 h-5 text-pink-500" />
+                            Liked Ideas ({likedIdeas.length})
+                        </h2>
+
+                        {likedIdeas.length === 0 ? (
+                            <p className="text-zinc-500 text-sm italic">You haven't liked any ideas yet.</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="border-b border-white/10 text-zinc-400 text-sm">
+                                            <th className="pb-3 pl-2">Title</th>
+                                            <th className="pb-3">Category</th>
+                                            <th className="pb-3">Price</th>
+                                            <th className="pb-3">AI Score</th>
+                                            <th className="pb-3"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5">
+                                        {likedIdeas.map(item => (
+                                            <tr key={item.idea_id} className="group hover:bg-white/5 transition-colors">
+                                                <td className="py-4 pl-2 font-medium text-white">{item.title}</td>
+                                                <td className="py-4 text-zinc-400 text-sm">{item.category || 'N/A'}</td>
+                                                <td className="py-4 text-green-400 font-mono">${item.price.toLocaleString()}</td>
+                                                <td className="py-4">
+                                                    <div className="flex items-center gap-1">
+                                                        <span className={`font-bold ${item.overall_score >= 7.5 ? 'text-green-500' : item.overall_score >= 5 ? 'text-yellow-500' : 'text-red-500'}`}>
+                                                            {item.overall_score.toFixed(1)}
+                                                        </span>
+                                                        <span className="text-xs text-zinc-600">/10</span>
+                                                    </div>
+                                                </td>
+                                                <td className="py-4 text-right pr-2">
+                                                    <a
+                                                        href={`/pages/details.html?id=${item.idea_id}`}
+                                                        className="text-zinc-500 hover:text-white transition-colors inline-block"
+                                                    >
+                                                        <ArrowRightIcon className="w-5 h-5" />
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Saved Modal */}
+            {showSavedModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-8 max-w-5xl w-full relative shadow-2xl animate-in zoom-in-95 duration-200 max-h-[80vh] overflow-y-auto">
+                        <button
+                            onClick={() => setShowSavedModal(false)}
+                            className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+
+                        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                            <BookmarkIcon className="w-5 h-5 text-blue-500" />
+                            Saved Ideas ({savedIdeas.length})
+                        </h2>
+
+                        {savedIdeas.length === 0 ? (
+                            <p className="text-zinc-500 text-sm italic">You haven't saved any ideas yet.</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="border-b border-white/10 text-zinc-400 text-sm">
+                                            <th className="pb-3 pl-2">Title</th>
+                                            <th className="pb-3">Category</th>
+                                            <th className="pb-3">Price</th>
+                                            <th className="pb-3">AI Score</th>
+                                            <th className="pb-3"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5">
+                                        {savedIdeas.map(item => (
+                                            <tr key={item.idea_id} className="group hover:bg-white/5 transition-colors">
+                                                <td className="py-4 pl-2 font-medium text-white">{item.title}</td>
+                                                <td className="py-4 text-zinc-400 text-sm">{item.category || 'N/A'}</td>
+                                                <td className="py-4 text-green-400 font-mono">${item.price.toLocaleString()}</td>
+                                                <td className="py-4">
+                                                    <div className="flex items-center gap-1">
+                                                        <span className={`font-bold ${item.overall_score >= 7.5 ? 'text-green-500' : item.overall_score >= 5 ? 'text-yellow-500' : 'text-red-500'}`}>
+                                                            {item.overall_score.toFixed(1)}
+                                                        </span>
+                                                        <span className="text-xs text-zinc-600">/10</span>
+                                                    </div>
+                                                </td>
+                                                <td className="py-4 text-right pr-2">
+                                                    <a
+                                                        href={`/pages/details.html?id=${item.idea_id}`}
+                                                        className="text-zinc-500 hover:text-white transition-colors inline-block"
+                                                    >
+                                                        <ArrowRightIcon className="w-5 h-5" />
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
