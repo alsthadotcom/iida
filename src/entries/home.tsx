@@ -25,7 +25,10 @@ const Home = () => {
             <div className="max-w-7xl mx-auto px-4 pt-32 pb-12 flex flex-col items-center animate-in fade-in duration-700">
                 <Hero />
                 <div className="w-full flex justify-center mb-12">
-                    <InputArea onGenerate={() => { }} />
+                    <InputArea
+                        onGenerate={() => { }}
+                        onNavigate={() => window.location.href = '/pages/signup.html'}
+                    />
                 </div>
                 <TrendingGrid limit={4} onItemClick={(item) => window.location.href = `/pages/details.html?id=${item.idea_id}`} />
                 <div className="flex justify-center mt-8">
