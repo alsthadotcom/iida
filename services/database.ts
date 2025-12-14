@@ -528,8 +528,8 @@ export async function getUserListings(userId: string): Promise<{ data: Marketpla
             ai_scoring (
                 overall_score,
                 uniqueness,
-                viability,
-                profitability
+                product_market_fit,
+                business_model_robustness
             )
         `)
         .eq('user_id', userId)
@@ -549,8 +549,8 @@ export async function getUserListings(userId: string): Promise<{ data: Marketpla
             title: item.title,
             description: item.one_line_description || '',
             uniqueness: scoreData?.uniqueness || 0,
-            viability: scoreData?.viability || 0,
-            profitability: scoreData?.profitability || 'N/A',
+            viability: scoreData?.product_market_fit || 0, // Map PMF to legacy viability
+            profitability: 'Analysis Completed', // Placeholder as per view definition
             category: item.category,
             secondary_category: item.secondary_category,
             mvp: false,
