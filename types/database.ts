@@ -69,6 +69,11 @@ export interface IdeaListing {
     additional_doc_2?: string | null;
     additional_doc_3?: string | null;
 
+    mvp_type?: string | null;      // 'digital' | 'physical'
+    mvp_url?: string | null;       // For Digital
+    mvp_image_url?: string | null; // For Physical
+    mvp_video_url?: string | null; // For Physical
+
     created_at?: string;
     updated_at?: string;
 }
@@ -182,6 +187,12 @@ export interface IdeaDetailView {
     additional_doc_1?: string | null;
     additional_doc_2?: string | null;
     additional_doc_3?: string | null;
+
+    // MVP Fields
+    mvp_type?: string | null;
+    mvp_url?: string | null;
+    mvp_image_url?: string | null;
+    mvp_video_url?: string | null;
 
     created_at: string;
     updated_at: string;

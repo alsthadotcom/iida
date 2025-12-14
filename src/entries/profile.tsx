@@ -73,7 +73,14 @@ const ProfilePage = () => {
             if (data) {
                 setUserInfo(data);
                 params_username_hack(data.username);
-                params_name_hack(data.full_name || data.username || '');
+
+                const cleanUser = data.username.replace(/^@/, '').toLowerCase();
+                const cleanFull = data.full_name ? data.full_name.toLowerCase().trim() : '';
+                // If name is identical to username, treat as empty (user logic)
+                const isSame = cleanFull === cleanUser || cleanFull === data.username.toLowerCase() || data.full_name === data.username;
+                const safeName = (data.full_name && !isSame && !data.full_name.startsWith('@')) ? data.full_name : '';
+
+                params_name_hack(safeName);
             } else {
                 setMessage({ type: 'error', text: 'User not found' });
             }
@@ -106,7 +113,14 @@ const ProfilePage = () => {
         } else if (data) {
             setUserInfo(data);
             setEditUsername(data.username);
-            setEditName(data.full_name || data.username || '');
+
+
+            const cleanUser = data.username.replace(/^@/, '').toLowerCase();
+            const cleanFull = data.full_name ? data.full_name.toLowerCase().trim() : '';
+            const isSame = cleanFull === cleanUser || cleanFull === data.username.toLowerCase() || data.full_name === data.username;
+            const safeName = (data.full_name && !isSame && !data.full_name.startsWith('@')) ? data.full_name : '';
+
+            setEditName(safeName);
         }
 
         // Load liked and saved ideas
@@ -319,7 +333,9 @@ const ProfilePage = () => {
                         </div>
 
                         <div>
-                            <h2 className="text-xl font-bold text-white leading-tight">{userInfo.full_name || userInfo.username}</h2>
+                            <h2 className="text-xl font-bold text-white leading-tight">
+                                {(userInfo.full_name && userInfo.full_name.toLowerCase().replace(/^@/, '') !== userInfo.username.toLowerCase().replace(/^@/, '') && !userInfo.full_name.startsWith('@')) ? userInfo.full_name : userInfo.username}
+                            </h2>
                             <p className="text-green-500 font-medium text-sm mt-0.5">@{editUsername.replace(/^@/, '').toLowerCase()}</p>
                             <div className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-900/30 text-green-400 mt-2 border border-green-900/50">
                                 Pro Member

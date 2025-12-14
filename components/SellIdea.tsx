@@ -186,6 +186,13 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
     const [existingAdditionalDocs, setExistingAdditionalDocs] = useState<string[]>([]);
     const [hasAdditionalDocs, setHasAdditionalDocs] = useState<boolean | null>(null);
 
+    // MVP State
+    const [hasMvp, setHasMvp] = useState<boolean | null>(null);
+    const [mvpType, setMvpType] = useState<string>('digital'); // 'digital' | 'physical'
+    const [mvpUrl, setMvpUrl] = useState('');
+    const [mvpImage, setMvpImage] = useState<File | null>(null);
+    const [mvpVideo, setMvpVideo] = useState<File | null>(null);
+
     // Navigation
     const [currentStep, setCurrentStep] = useState(1);
     const TOTAL_STEPS = 9;
@@ -334,27 +341,41 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('You must be logged in');
 
-            // 1. Upload files
+            // 1. Upload Main Document
             let mainDocUrl = existingMainDocUrl || '';
             if (mainDocument) {
-                const { data, error } = await uploadDocument(mainDocument, user.id, 'documents');
-                if (error) throw error;
-                mainDocUrl = data!.url;
+                const { data } = await uploadDocument(mainDocument, user.id, 'documents');
+                if (data) mainDocUrl = data.url;
             }
 
-            const additionalDocUrls: string[] = [...existingAdditionalDocs];
-            for (const doc of additionalDocuments) {
-                const { data, error } = await uploadDocument(doc, user.id, 'documents');
-                if (error) throw error;
-                additionalDocUrls.push(data!.url);
+            // 2. Upload Additional Docs
+            const newAdditionalUrls: string[] = [];
+            for (const file of additionalDocuments) {
+                const { data } = await uploadDocument(file, user.id, 'documents');
+                if (data) newAdditionalUrls.push(data.url);
+            }
+            const additionalDocUrls = [...existingAdditionalDocs, ...newAdditionalUrls];
+
+            // 3. Upload MVP Assets
+            let mvpImgUrl: string | null = null;
+            let mvpVidUrl: string | null = null;
+
+            if (hasMvp && mvpType === 'physical') {
+                if (mvpImage) {
+                    const { data } = await uploadDocument(mvpImage, user.id, 'documents');
+                    if (data) mvpImgUrl = data.url;
+                }
+                if (mvpVideo) {
+                    const { data } = await uploadDocument(mvpVideo, user.id, 'documents');
+                    if (data) mvpVidUrl = data.url;
+                }
             }
 
-            // 2. Prepare Payload (V4 Schema)
             const listingData: any = {
                 title,
                 one_line_description: shortDescription,
                 category: primaryCategory,
-                secondary_category: secondaryCategory || null,
+                secondary_category: secondaryCategory,
 
                 pain_who: painWho,
                 pain_problem: painProblem.filter(s => s.trim()),
@@ -389,6 +410,11 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
                 additional_doc_1: additionalDocUrls[0] || null,
                 additional_doc_2: additionalDocUrls[1] || null,
                 additional_doc_3: additionalDocUrls[2] || null,
+
+                mvp_type: hasMvp ? mvpType : null,
+                mvp_url: (hasMvp && mvpType === 'digital') ? mvpUrl : null,
+                mvp_image_url: mvpImgUrl,
+                mvp_video_url: mvpVidUrl,
             };
 
             // 3. Save
@@ -726,6 +752,87 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
                                                     disabled={(additionalDocuments.length + existingAdditionalDocs.length) >= 3}
                                                     className="block w-full text-sm text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-zinc-800 file:text-green-500 hover:file:bg-zinc-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                 />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* MVP Toggle Section */}
+                            <div>
+                                <Label>Do you have an MVP (Minimum Viable Product)?</Label>
+                                <div className="flex items-center gap-4 mt-2 mb-4">
+                                    <button
+                                        onClick={() => setHasMvp(true)}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${hasMvp === true
+                                            ? 'bg-green-500 text-black border-green-500'
+                                            : 'bg-zinc-900 text-zinc-400 border-zinc-700 hover:border-zinc-500'
+                                            }`}
+                                    >
+                                        Yes
+                                    </button>
+                                    <button
+                                        onClick={() => setHasMvp(false)}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${hasMvp === false
+                                            ? 'bg-zinc-200 text-black border-zinc-200'
+                                            : 'bg-zinc-900 text-zinc-400 border-zinc-700 hover:border-zinc-500'
+                                            }`}
+                                    >
+                                        No
+                                    </button>
+                                </div>
+
+                                {hasMvp && (
+                                    <div className="space-y-6 animate-in fade-in slide-in-from-top-2 p-4 bg-zinc-900/30 rounded-lg border border-zinc-800">
+
+                                        <div>
+                                            <Label>What type of MVP is it?</Label>
+                                            <Select
+                                                value={mvpType}
+                                                onChange={(val) => setMvpType(val)}
+                                                options={['digital', 'physical']}
+                                                placeholder="Select MVP Type"
+                                            />
+                                        </div>
+
+                                        {mvpType === 'digital' && (
+                                            <div>
+                                                <Label>MVP URL <span className="text-red-500">*</span></Label>
+                                                <Input
+                                                    value={mvpUrl}
+                                                    onChange={(e: any) => setMvpUrl(e.target.value)}
+                                                    placeholder="https://example.com/demo"
+                                                />
+                                            </div>
+                                        )}
+
+                                        {mvpType === 'physical' && (
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <Label>Product Image <span className="text-red-500">*</span></Label>
+                                                    <div className="flex items-center gap-3">
+                                                        <input
+                                                            type="file"
+                                                            onChange={(e) => e.target.files && setMvpImage(e.target.files[0])}
+                                                            accept="image/*"
+                                                            className="block w-full text-sm text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-zinc-800 file:text-green-500 hover:file:bg-zinc-700 cursor-pointer"
+                                                        />
+                                                        {mvpImage && <CheckCircleIconSolid className="w-6 h-6 text-green-500" />}
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <Label>Product Video <span className="text-red-500">*</span></Label>
+                                                    <div className="flex items-center gap-3">
+                                                        <input
+                                                            type="file"
+                                                            onChange={(e) => e.target.files && setMvpVideo(e.target.files[0])}
+                                                            accept="video/*"
+                                                            className="block w-full text-sm text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-zinc-800 file:text-green-500 hover:file:bg-zinc-700 cursor-pointer"
+                                                        />
+                                                        {mvpVideo && <CheckCircleIconSolid className="w-6 h-6 text-green-500" />}
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
