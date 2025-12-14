@@ -4,10 +4,10 @@
  */
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
-import { getUserLikedListings, getUserSavedListings } from '../services/database';
-import type { MarketplaceView } from '../types/database';
+import { getUserLikedListings, getUserSavedListings, getUserInfoById } from '../services/database';
+import type { MarketplaceView, UserInfo } from '../types/database';
 import { User } from '@supabase/supabase-js';
-import { HeartIcon, BookmarkIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
+import { HeartIcon, BookmarkIcon, ArrowRightIcon, UserCircleIcon } from '@heroicons/react/24/outline';
 
 interface ProfileProps {
     onNavigate: (page: string, ideaId?: string) => void;
@@ -15,6 +15,7 @@ interface ProfileProps {
 
 export const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
     const [user, setUser] = useState<User | null>(null);
+    const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
     const [likedIdeas, setLikedIdeas] = useState<MarketplaceView[]>([]);
     const [savedIdeas, setSavedIdeas] = useState<MarketplaceView[]>([]);
     const [loading, setLoading] = useState(true);
@@ -26,6 +27,11 @@ export const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
             setUser(user);
 
             if (user) {
+                // Fetch User Info (Profile)
+                const { data: profile } = await getUserInfoById(user.id);
+                setUserInfo(profile);
+
+                // Fetch Lists
                 const { data: likes } = await getUserLikedListings(user.id);
                 const { data: saves } = await getUserSavedListings(user.id);
                 setLikedIdeas(likes || []);
@@ -112,8 +118,23 @@ export const Profile: React.FC<ProfileProps> = ({ onNavigate }) => {
 
     return (
         <div className="w-full max-w-7xl mx-auto px-4 pt-24 pb-12 animate-in fade-in duration-500">
-            <h1 className="text-3xl font-bold text-white mb-2">My Profile</h1>
-            <p className="text-zinc-400 mb-8">{user.email}</p>
+            {/* Header / Profile Info */}
+            <div className="flex items-center gap-6 mb-12">
+                <div className="w-20 h-20 rounded-full bg-zinc-800 flex items-center justify-center overflow-hidden border-2 border-green-500/50">
+                    {userInfo?.avatar_url || userInfo?.profile_picture ? (
+                        <img src={userInfo.avatar_url || userInfo.profile_picture || ''} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                        <UserCircleIcon className="w-12 h-12 text-zinc-500" />
+                    )}
+                </div>
+                <div>
+                    <h1 className="text-3xl font-bold text-white mb-1">
+                        {userInfo?.full_name || userInfo?.username || 'User'}
+                    </h1>
+                    <p className="text-zinc-400">{user.email}</p>
+                    {userInfo?.username && <p className="text-zinc-600 text-sm mt-1">{userInfo.username}</p>}
+                </div>
+            </div>
 
             <ListingTable
                 title="Liked Ideas"
