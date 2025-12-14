@@ -107,7 +107,8 @@ CREATE TABLE ai_scoring (
       (COALESCE(uniqueness, 0) + COALESCE(problem_impact, 0) + COALESCE(viability, 0) + COALESCE(scalability, 0)) / 4
     ) STORED,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT ai_scoring_idea_id_key UNIQUE (idea_id)
 );
 ALTER TABLE ai_scoring ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public AI scores" ON ai_scoring FOR SELECT USING (true);
