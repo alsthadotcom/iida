@@ -547,12 +547,12 @@ export async function getUserListings(userId: string): Promise<{ data: Marketpla
             idea_id: item.idea_id,
             ai_score_id: scoreData?.ai_score_id || 'pending',
             title: item.title,
-            description: item.description,
+            description: item.one_line_description || '', // Mapped from one_line for view compatibility
             uniqueness: scoreData?.uniqueness || 0,
             viability: scoreData?.viability || 0,
             profitability: scoreData?.profitability || 'N/A',
             category: item.category,
-            mvp: item.mvp,
+            mvp: (item.stage === 'MVP built' || item.stage === 'Revenue generating'), // Derived MVP status
             document_url: item.document_url,
             price: item.price,
             username: '', // Not needed for dashboard view usually, or fetch if needed
