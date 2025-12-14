@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ArrowLeftIcon, DocumentPlusIcon, PhotoIcon, VideoCameraIcon, XMarkIcon, SparklesIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, DocumentPlusIcon, PhotoIcon, VideoCameraIcon, XMarkIcon, SparklesIcon, CheckCircleIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { analyzeAssetScores } from '../services/gemini';
 import { createIdeaListing, createAIScoring, uploadDocument, getIdeaDetails, updateIdeaListing, updateAIScoring } from '../services/database';
 import { supabase } from '../services/supabase';
@@ -49,6 +49,75 @@ interface AIScores {
     viability: number;
     scalability: number;
 }
+
+// Custom Dropdown Component
+interface CustomDropdownProps {
+    value: string;
+    options: string[];
+    onChange: (value: string) => void;
+    placeholder?: string;
+}
+
+const CustomDropdown: React.FC<CustomDropdownProps> = ({ value, options, onChange, placeholder = "Select an option" }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Close on click outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    return (
+        <div className="relative" ref={dropdownRef}>
+            <div
+                onClick={() => setIsOpen(!isOpen)}
+                className={`w-full bg-zinc-950/50 border rounded-lg px-4 py-3 flex justify-between items-center cursor-pointer transition-all ${isOpen || value ? 'border-green-500' : 'border-zinc-700 hover:border-zinc-500'
+                    }`}
+            >
+                <span className={value ? 'text-white' : 'text-zinc-500'}>
+                    {value || placeholder}
+                </span>
+                {isOpen ? (
+                    <ChevronUpIcon className="w-4 h-4 text-green-500" />
+                ) : (
+                    <ChevronDownIcon className="w-4 h-4 text-zinc-500" />
+                )}
+            </div>
+
+            {isOpen && (
+                <div className="absolute z-50 w-full mt-2 bg-zinc-950 border border-zinc-800 rounded-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                    <div className="max-h-60 overflow-y-auto">
+                        {options.map((opt) => {
+                            const isSelected = opt === value;
+                            return (
+                                <div
+                                    key={opt}
+                                    onClick={() => {
+                                        onChange(opt);
+                                        setIsOpen(false);
+                                    }}
+                                    className={`px-4 py-3 cursor-pointer flex justify-between items-center transition-colors ${isSelected
+                                            ? 'bg-green-500/10 text-green-500'
+                                            : 'text-zinc-300 hover:bg-zinc-900 hover:text-white'
+                                        }`}
+                                >
+                                    <span>{opt}</span>
+                                    {isSelected && <CheckCircleIcon className="w-5 h-5 text-green-500" />}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
     // --- State ---
@@ -674,21 +743,15 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
                             <div className="grid md:grid-cols-3 gap-6">
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-300 mb-1">Industry / Category</label>
-                                    <select value={industry} onChange={(e) => setIndustry(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none">
-                                        {INDUSTRIES.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
+                                    <CustomDropdown value={industry} options={INDUSTRIES} onChange={setIndustry} />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-300 mb-1">Target Customer Type</label>
-                                    <select value={targetCustomer} onChange={(e) => setTargetCustomer(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none">
-                                        {CUSTOMER_TYPES.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
+                                    <CustomDropdown value={targetCustomer} options={CUSTOMER_TYPES} onChange={setTargetCustomer} />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-300 mb-1">Stage</label>
-                                    <select value={stage} onChange={(e) => setStage(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none">
-                                        {STAGES.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
+                                    <CustomDropdown value={stage} options={STAGES} onChange={setStage} />
                                 </div>
                             </div>
                         </div>
@@ -719,9 +782,7 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-300 mb-1">Urgency Level</label>
-                                    <select value={urgencyLevel} onChange={(e) => setUrgencyLevel(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none">
-                                        {URGENCY_LEVELS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
+                                    <CustomDropdown value={urgencyLevel} options={URGENCY_LEVELS} onChange={setUrgencyLevel} />
                                 </div>
                             </div>
 
@@ -745,9 +806,7 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
                             <div className="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-300 mb-1">Primary Advantage</label>
-                                    <select value={primaryAdvantage} onChange={(e) => setPrimaryAdvantage(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none">
-                                        {PRIMARY_ADVANTAGES.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
+                                    <CustomDropdown value={primaryAdvantage} options={PRIMARY_ADVANTAGES} onChange={setPrimaryAdvantage} />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-300 mb-1">Differentiation Strength (1-5)</label>
@@ -768,21 +827,15 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
                             <div className="grid md:grid-cols-3 gap-6">
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-300 mb-1">Market Size</label>
-                                    <select value={marketSize} onChange={(e) => setMarketSize(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none">
-                                        {MARKET_SIZES.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
+                                    <CustomDropdown value={marketSize} options={MARKET_SIZES} onChange={setMarketSize} />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-300 mb-1">Growth Trend</label>
-                                    <select value={marketGrowthTrend} onChange={(e) => setMarketGrowthTrend(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none">
-                                        {MARKET_GROWTH_TRENDS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
+                                    <CustomDropdown value={marketGrowthTrend} options={MARKET_GROWTH_TRENDS} onChange={setMarketGrowthTrend} />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-300 mb-1">Geographic Scope</label>
-                                    <select value={geographicScope} onChange={(e) => setGeographicScope(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none">
-                                        {GEOGRAPHIC_SCOPES.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
+                                    <CustomDropdown value={geographicScope} options={GEOGRAPHIC_SCOPES} onChange={setGeographicScope} />
                                 </div>
                             </div>
                         </div>
@@ -795,21 +848,15 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
                             <div className="grid md:grid-cols-3 gap-6">
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-300 mb-1">Revenue Type</label>
-                                    <select value={revenueModelType} onChange={(e) => setRevenueModelType(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none">
-                                        {REVENUE_MODELS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
+                                    <CustomDropdown value={revenueModelType} options={REVENUE_MODELS} onChange={setRevenueModelType} />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-300 mb-1">Expected Price / Customer</label>
-                                    <select value={expectedPricePerCustomer} onChange={(e) => setExpectedPricePerCustomer(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none">
-                                        {PRICE_PER_CUSTOMER.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
+                                    <CustomDropdown value={expectedPricePerCustomer} options={PRICE_PER_CUSTOMER} onChange={setExpectedPricePerCustomer} />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-300 mb-1">Cost Intensity</label>
-                                    <select value={costIntensity} onChange={(e) => setCostIntensity(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none">
-                                        {COST_INTENSITIES.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
+                                    <CustomDropdown value={costIntensity} options={COST_INTENSITIES} onChange={setCostIntensity} />
                                 </div>
                             </div>
                         </div>
@@ -824,21 +871,15 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
                             <div className="grid md:grid-cols-3 gap-6">
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-300 mb-1">Build Difficulty</label>
-                                    <select value={buildDifficulty} onChange={(e) => setBuildDifficulty(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none">
-                                        {BUILD_DIFFICULTIES.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
+                                    <CustomDropdown value={buildDifficulty} options={BUILD_DIFFICULTIES} onChange={setBuildDifficulty} />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-300 mb-1">Time to v1</label>
-                                    <select value={timeToFirstVersion} onChange={(e) => setTimeToFirstVersion(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none">
-                                        {TIMES_TO_VERSION.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
+                                    <CustomDropdown value={timeToFirstVersion} options={TIMES_TO_VERSION} onChange={setTimeToFirstVersion} />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-300 mb-1">Regulatory / Legal</label>
-                                    <select value={regulatoryDependency} onChange={(e) => setRegulatoryDependency(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none">
-                                        {REGULATORY_DEPENDENCIES.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
+                                    <CustomDropdown value={regulatoryDependency} options={REGULATORY_DEPENDENCIES} onChange={setRegulatoryDependency} />
                                 </div>
                             </div>
 
@@ -848,9 +889,7 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
                                 <div className="grid md:grid-cols-1 gap-6">
                                     <div>
                                         <label className="block text-sm font-medium text-zinc-300 mb-1">Validation Level</label>
-                                        <select value={validationLevel} onChange={(e) => setValidationLevel(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none">
-                                            {VALIDATION_LEVELS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                        </select>
+                                        <CustomDropdown value={validationLevel} options={VALIDATION_LEVELS} onChange={setValidationLevel} />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-zinc-300 mb-1">Validation Notes</label>
@@ -868,21 +907,15 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
                             <div className="grid md:grid-cols-3 gap-6">
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-300 mb-1">What Is Included</label>
-                                    <select value={whatIsIncluded} onChange={(e) => setWhatIsIncluded(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none">
-                                        {WHATS_INCLUDED.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
+                                    <CustomDropdown value={whatIsIncluded} options={WHATS_INCLUDED} onChange={setWhatIsIncluded} />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-300 mb-1">Resale Rights</label>
-                                    <select value={buyerResaleRights} onChange={(e) => setBuyerResaleRights(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none">
-                                        {BUYER_RIGHTS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
+                                    <CustomDropdown value={buyerResaleRights} options={BUYER_RIGHTS} onChange={setBuyerResaleRights} />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-300 mb-1">Exclusivity</label>
-                                    <select value={exclusivity} onChange={(e) => setExclusivity(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none">
-                                        {EXCLUSIVITIES.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
+                                    <CustomDropdown value={exclusivity} options={EXCLUSIVITIES} onChange={setExclusivity} />
                                 </div>
                             </div>
                             <div>
