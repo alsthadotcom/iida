@@ -1,8 +1,9 @@
--- Update the marketplace_view to include market_saturation and capital_intensity
+-- Update the marketplace view to include market_saturation and capital_intensity
+-- This view is used by the Marketplace page
 
-DROP VIEW IF EXISTS marketplace_view CASCADE;
+DROP VIEW IF EXISTS marketplace CASCADE;
 
-CREATE OR REPLACE VIEW marketplace_view AS
+CREATE OR REPLACE VIEW marketplace AS
 SELECT 
     gen_random_uuid() AS marketplace_id,
     i.idea_id,

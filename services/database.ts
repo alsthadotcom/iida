@@ -534,7 +534,9 @@ export async function getUserListings(userId: string): Promise<{ data: Marketpla
                 overall_score,
                 uniqueness,
                 product_market_fit,
-                business_model_robustness
+                business_model_robustness,
+                market_saturation,
+                capital_intensity
             )
         `)
         .eq('user_id', userId)
@@ -556,6 +558,8 @@ export async function getUserListings(userId: string): Promise<{ data: Marketpla
             uniqueness: scoreData?.uniqueness || 0,
             viability: scoreData?.product_market_fit || 0, // Map PMF to legacy viability
             profitability: 'Analysis Completed', // Placeholder as per view definition
+            market_saturation: scoreData?.market_saturation || 0,
+            capital_intensity: scoreData?.capital_intensity || 0,
             category: item.category,
             secondary_category: item.secondary_category,
             mvp: false,
