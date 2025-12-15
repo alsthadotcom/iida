@@ -451,8 +451,8 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
                 const { data: ideaData, error } = await createIdeaListing({ ...listingData, user_id: user.id });
                 if (error || !ideaData) throw error;
 
-                // Generate random scores between 25-90 for each metric
-                const randomScore = () => Math.floor(Math.random() * (90 - 25 + 1)) + 25;
+                // Generate random scores between 10-90 for each metric
+                const randomScore = () => Math.floor(Math.random() * (90 - 10 + 1)) + 10;
 
                 await createAIScoring({
                     idea_id: ideaData.idea_id,
