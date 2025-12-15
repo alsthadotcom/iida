@@ -31,6 +31,8 @@ interface SellIdeaProps {
 
 // --- Reusable Form Components ---
 
+import { AutoResizeTextarea } from './AutoResizeTextarea';
+
 const Label = ({ children }: { children?: React.ReactNode }) => (
     <label className="block text-sm font-medium text-zinc-400 mb-2 uppercase tracking-wider text-[11px] font-mono">
         {children}
@@ -49,12 +51,12 @@ const Input = ({ value, onChange, placeholder, maxLength, type = "text" }: any) 
 );
 
 const TextArea = ({ value, onChange, placeholder, rows = 3 }: any) => (
-    <textarea
+    <AutoResizeTextarea
         value={value}
         onChange={onChange}
         placeholder={placeholder}
         rows={rows}
-        className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-4 py-3 text-white placeholder-zinc-600 focus:border-[#22C55E] focus:ring-1 focus:ring-[#22C55E] focus:outline-none transition-colors resize-none"
+        className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-4 py-3 text-white placeholder-zinc-600 focus:border-[#22C55E] focus:ring-1 focus:ring-[#22C55E] focus:outline-none transition-colors"
     />
 );
 

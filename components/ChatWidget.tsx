@@ -13,6 +13,7 @@ import {
     ChevronLeftIcon,
     UserIcon
 } from '@heroicons/react/24/outline';
+import { AutoResizeTextarea } from './AutoResizeTextarea';
 
 type ViewArgs = 'inbox' | 'thread';
 
@@ -189,7 +190,7 @@ export const ChatWidget: React.FC = () => {
         await fetchMessages();
     };
 
-    const handleSend = async (e: React.FormEvent) => {
+    const handleSend = async (e: React.FormEvent | React.KeyboardEvent) => {
         e.preventDefault();
         if (!user || !activeThreadId || !newMessage.trim()) return;
 
@@ -328,13 +329,18 @@ export const ChatWidget: React.FC = () => {
                                 {/* Input Area */}
                                 <div className="p-3 bg-zinc-950 border-t border-zinc-800">
                                     <form onSubmit={handleSend} className="relative flex items-center gap-2">
-                                        <input
-                                            type="text"
+                                        <AutoResizeTextarea
                                             value={newMessage}
                                             onChange={(e) => setNewMessage(e.target.value)}
                                             placeholder="Type a message..."
-                                            className="w-full bg-zinc-900 border border-zinc-700 rounded-full px-4 py-2.5 text-sm text-white focus:outline-none focus:border-green-500 placeholder-zinc-500 pr-10"
+                                            className="w-full bg-zinc-900 border border-zinc-700 rounded-2xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-green-500 placeholder-zinc-500 pr-10 min-h-[42px] max-h-[120px] scrollbar-thin scrollbar-thumb-zinc-700"
                                             maxLength={4000}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && !e.shiftKey) {
+                                                    e.preventDefault();
+                                                    handleSend(e);
+                                                }
+                                            }}
                                         />
                                         <button
                                             type="submit"

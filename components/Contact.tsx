@@ -4,6 +4,7 @@
 */
 import React from 'react';
 import { EnvelopeIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import { AutoResizeTextarea } from './AutoResizeTextarea';
 
 export const Contact: React.FC = () => {
     return (
@@ -51,7 +52,7 @@ export const Contact: React.FC = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-zinc-300 mb-1">Message</label>
-                            <textarea className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-green-500 h-32 resize-none" placeholder="How can we help?"></textarea>
+                            <AutoResizeTextarea className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-green-500 min-h-[128px]" placeholder="How can we help?" />
                         </div>
                         <button className="w-full bg-white text-black font-bold py-3 rounded-lg hover:bg-zinc-200 transition-colors">
                             Send Message
