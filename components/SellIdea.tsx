@@ -190,10 +190,13 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
 
     // MVP State
     const [hasMvp, setHasMvp] = useState<boolean | null>(null);
-    const [mvpType, setMvpType] = useState<string>('digital'); // 'digital' | 'physical'
+    const [mvpType, setMvpType] = useState<'digital' | 'physical' | null>(null);
     const [mvpUrl, setMvpUrl] = useState('');
     const [mvpImage, setMvpImage] = useState<File | null>(null);
     const [mvpVideo, setMvpVideo] = useState<File | null>(null);
+
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
 
     // Navigation
     const [currentStep, setCurrentStep] = useState(1);
@@ -446,7 +449,8 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
             if (editId) {
                 const { error } = await updateIdeaListing(editId, listingData);
                 if (error) throw error;
-                alert('Listing updated!');
+                setSuccessMessage('Listing updated successfully!');
+                setShowSuccessModal(true);
             } else {
                 const { data: ideaData, error } = await createIdeaListing({ ...listingData, user_id: user.id });
                 if (error || !ideaData) throw error;
@@ -468,9 +472,10 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
                     social_value: randomScore()
                 });
 
-                alert('Idea listed successfully!');
+                setSuccessMessage('Idea listed successfully!');
+                setShowSuccessModal(true);
             }
-            onBack();
+            // onBack() will be called when modal is closed
 
         } catch (err: any) {
             setSubmitError(err.message);
@@ -902,6 +907,39 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
                     )}
                 </div>
             </div>
+
+            {/* Success Modal */}
+            {showSuccessModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 max-w-sm w-full relative zoom-in-95 animate-in duration-300 shadow-2xl">
+                        <div className="flex flex-col items-center text-center gap-6">
+                            {/* Success Icon */}
+                            <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center border border-green-500/20">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-10 h-10 text-green-500">
+                                    <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+
+                            {/* Text */}
+                            <div className="space-y-2">
+                                <h3 className="text-2xl font-bold text-white">Success!</h3>
+                                <p className="text-zinc-400 text-sm">{successMessage}</p>
+                            </div>
+
+                            {/* Button */}
+                            <button
+                                onClick={() => {
+                                    setShowSuccessModal(false);
+                                    onBack();
+                                }}
+                                className="w-full bg-white hover:bg-zinc-200 text-black font-bold py-3.5 rounded-xl transition-all"
+                            >
+                                Continue
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
