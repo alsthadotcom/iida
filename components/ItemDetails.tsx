@@ -208,47 +208,63 @@ export const ItemDetails: React.FC<ItemDetailsProps> = ({ ideaId, onBack }) => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
                             {[
-                                { label: 'Uniqueness', value: item.uniqueness, description: 'How novel is this idea?' },
-                                { label: 'Customer Pain', value: item.customer_pain, description: 'Problem severity' },
-                                { label: 'Scalability', value: item.scalability, description: 'Growth potential' },
-                                { label: 'Product-Market Fit', value: item.product_market_fit, description: 'Market alignment' },
-                                { label: 'Technical Complexity', value: item.technical_complexity, description: 'Implementation difficulty' },
-                                { label: 'Capital Intensity', value: item.capital_intensity, description: 'Investment required' },
-                                { label: 'Market Saturation', value: item.market_saturation, description: 'Competition level' },
-                                { label: 'Business Model', value: item.business_model_robustness, description: 'Revenue strength' },
-                                { label: 'Market Growth Rate', value: item.market_growth_rate, description: 'Industry momentum' },
-                                { label: 'Social Value', value: item.social_value, description: 'Societal impact' }
+                                { label: 'Uniqueness', value: item.uniqueness },
+                                { label: 'Customer Pain', value: item.customer_pain },
+                                { label: 'Scalability', value: item.scalability },
+                                { label: 'Product-Market Fit', value: item.product_market_fit },
+                                { label: 'Technical Complexity', value: item.technical_complexity },
+                                { label: 'Capital Intensity', value: item.capital_intensity },
+                                { label: 'Market Saturation', value: item.market_saturation },
+                                { label: 'Business Model', value: item.business_model_robustness },
+                                { label: 'Market Growth', value: item.market_growth_rate },
+                                { label: 'Social Value', value: item.social_value }
                             ].map((metric, idx) => {
-                                const getColor = (value: number) => {
-                                    if (value >= 75) return 'text-green-400 bg-green-500/10 border-green-500/20';
-                                    if (value >= 50) return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
-                                    return 'text-orange-400 bg-orange-500/10 border-orange-500/20';
+                                const getStrokeColor = (value: number) => {
+                                    if (value >= 75) return '#22c55e'; // green
+                                    if (value >= 50) return '#eab308'; // yellow
+                                    return '#f97316'; // orange
                                 };
 
-                                const getBarColor = (value: number) => {
-                                    if (value >= 75) return 'bg-green-500';
-                                    if (value >= 50) return 'bg-yellow-500';
-                                    return 'bg-orange-500';
-                                };
+                                const radius = 40;
+                                const circumference = 2 * Math.PI * radius;
+                                const strokeDashoffset = circumference - (metric.value / 100) * circumference;
 
                                 return (
-                                    <div key={idx} className="bg-zinc-950/50 border border-zinc-800 rounded-xl p-4 hover:border-zinc-700 transition-colors">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <div className="flex-1">
-                                                <h3 className="text-sm font-semibold text-white">{metric.label}</h3>
-                                                <p className="text-xs text-zinc-500">{metric.description}</p>
-                                            </div>
-                                            <div className={`px-3 py-1 rounded-lg border font-bold text-sm ${getColor(metric.value)}`}>
-                                                {metric.value}
+                                    <div key={idx} className="flex flex-col items-center gap-3">
+                                        <div className="relative">
+                                            <svg className="transform -rotate-90" width="100" height="100">
+                                                {/* Background circle */}
+                                                <circle
+                                                    cx="50"
+                                                    cy="50"
+                                                    r={radius}
+                                                    stroke="#27272a"
+                                                    strokeWidth="8"
+                                                    fill="none"
+                                                />
+                                                {/* Progress circle */}
+                                                <circle
+                                                    cx="50"
+                                                    cy="50"
+                                                    r={radius}
+                                                    stroke={getStrokeColor(metric.value)}
+                                                    strokeWidth="8"
+                                                    fill="none"
+                                                    strokeDasharray={circumference}
+                                                    strokeDashoffset={strokeDashoffset}
+                                                    strokeLinecap="round"
+                                                    className="transition-all duration-1000 ease-out"
+                                                />
+                                            </svg>
+                                            {/* Center text */}
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <span className="text-xl font-bold text-white">{metric.value}</span>
                                             </div>
                                         </div>
-                                        <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
-                                            <div
-                                                className={`h-full ${getBarColor(metric.value)} transition-all duration-500 rounded-full`}
-                                                style={{ width: `${metric.value}%` }}
-                                            />
+                                        <div className="text-center">
+                                            <p className="text-xs font-medium text-zinc-300">{metric.label}</p>
                                         </div>
                                     </div>
                                 );
