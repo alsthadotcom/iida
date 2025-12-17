@@ -94,6 +94,8 @@ export interface AIScoring {
     market_growth_rate: number;
     social_value: number; // Valuability to Society
 
+    validation_details?: any; // Rich JSON data from AI
+
     overall_score?: number;
     created_at?: string;
     updated_at?: string;
@@ -180,6 +182,8 @@ export interface IdeaDetailView {
     market_growth_rate: number;
     social_value: number;
 
+    validation_details?: any; // Rich JSON data from AI
+
     overall_score: number;
     price: number;
     username: string;
@@ -202,7 +206,7 @@ export interface IdeaDetailView {
 
 // Helpers
 export type NewIdeaListing = Omit<IdeaListing, 'idea_id' | 'created_at' | 'updated_at'>;
-export type NewAIScoring = Omit<AIScoring, 'ai_score_id' | 'created_at' | 'updated_at' | 'overall_score'>;
+export type NewAIScoring = Omit<AIScoring, 'ai_score_id' | 'created_at' | 'updated_at'>;
 export type NewUserInfo = Omit<UserInfo, 'user_id' | 'created_at' | 'updated_at'>;
 
 export interface Like {

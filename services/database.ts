@@ -454,6 +454,24 @@ export async function getIdeaDetailById(ideaId: string): Promise<{ data: IdeaDet
         console.warn('Strategy 3 Skipped: No username in view data');
     }
 
+    // Strategy 4: Fetch validation_details from ai_scoring if missing
+    if (!finalData.validation_details) {
+        try {
+            const { data: scoreData, error: scoreError } = await supabase
+                .from('ai_scoring')
+                .select('validation_details')
+                .eq('idea_id', ideaId)
+                .maybeSingle();
+
+            if (scoreData && scoreData.validation_details) {
+                finalData.validation_details = scoreData.validation_details;
+                // console.log('Patched validation_details from ai_scoring table');
+            }
+        } catch (e) {
+            console.warn('Strategy 4 Exception (validation_details)', e);
+        }
+    }
+
     return { data: finalData, error: null };
 }
 

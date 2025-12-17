@@ -8,12 +8,20 @@ import {
     XMarkIcon,
     ChevronRightIcon,
     ChevronLeftIcon,
+    ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { CheckCircleIcon as CheckCircleIconSolid } from '@heroicons/react/24/solid';
-import { createIdeaListing, createAIScoring, uploadDocument, getIdeaDetails, updateIdeaListing } from '../services/database';
+import { createIdeaListing, createAIScoring, uploadDocument, getIdeaDetails, updateIdeaListing, updateAIScoring } from '../services/database';
+import { validateIdeaPipeline, METRIC_SCHEMA, ValidationResult } from '../services/validationService';
+import { getTextFromPDF } from '../services/pdfService';
 import { supabase } from '../services/supabase';
+import { ValidationReport } from './ValidationReport';
 import { CATEGORIES } from '../constants/categories';
+
 import { ContentEditableList } from './ContentEditableList';
+
+// Declare Puter global
+declare const puter: any;
 
 // Local Categories Fallback
 const DEFAULT_CATEGORIES = [
@@ -136,6 +144,8 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
     const [isLoadingData, setIsLoadingData] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
+    const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+    const [showDebugLogs, setShowDebugLogs] = useState(false);
 
     // --- State: V4 Granular Schema ---
 
@@ -200,7 +210,13 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
 
     // Navigation
     const [currentStep, setCurrentStep] = useState(1);
-    const TOTAL_STEPS = 9;
+    const TOTAL_STEPS = 10;
+
+    // AI Validation State
+    const [validationModel, setValidationModel] = useState('gpt-4o');
+    const [aiInputLog, setAiInputLog] = useState('');
+    const [aiOutputLog, setAiOutputLog] = useState('');
+    const [isValidating, setIsValidating] = useState(false);
 
     const stepTitles = [
         "Idea Info",
@@ -211,7 +227,10 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
         "Solution Details",
         "Revenue Plan",
         "Impact",
-        "Finalize Listing"
+        "Revenue Plan",
+        "Impact",
+        "Finalize Listing",
+        "AI Validation"
     ];
 
     // --- Loading Edit Data ---
@@ -305,6 +324,9 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
             case 8: // Impact
                 return impactWho.trim() !== '' && impactImprovement.trim() !== '' && impactScale.trim() !== '';
             case 9: // Docs & Price
+            case 10: // AI Validation
+                return true; // Always valid to navigate back/forward, validation is optional action
+            case 99: // Docs & Price (Legacy map, just to be safe if I messed up counting, but let's stick to case 9 for previous step)
                 const hasDoc = (mainDocument !== null || existingMainDocUrl !== null);
                 const validPrice = !isNaN(parseFloat(price)) && parseFloat(price) > 0;
 
@@ -344,6 +366,11 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
         impactWho, impactImprovement, impactScale,
         mainDocument, existingMainDocUrl, price
     ]);
+
+    // --- Handlers ---
+
+    // State to track the ID of the idea being processed (uploaded or edited)
+    const [createdIdeaId, setCreatedIdeaId] = useState<string | null>(null);
 
     // --- Handlers ---
 
@@ -449,31 +476,34 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
             if (editId) {
                 const { error } = await updateIdeaListing(editId, listingData);
                 if (error) throw error;
-                setSuccessMessage('Listing updated successfully!');
-                setShowSuccessModal(true);
+                // Transition to Validation Step
+                setCreatedIdeaId(editId); // Track ID
+                setCurrentStep(10);
+                window.scrollTo(0, 0);
             } else {
                 const { data: ideaData, error } = await createIdeaListing({ ...listingData, user_id: user.id });
                 if (error || !ideaData) throw error;
 
-                // Generate random scores between 10-90 for each metric
-                const randomScore = () => Math.floor(Math.random() * (90 - 10 + 1)) + 10;
-
+                // Create initial placeholder scoring (optional, or just wait for AI)
+                // For now, let's create a placeholder entry with zeros so we can update it later
                 await createAIScoring({
                     idea_id: ideaData.idea_id,
-                    uniqueness: randomScore(),
-                    customer_pain: randomScore(),
-                    scalability: randomScore(),
-                    product_market_fit: randomScore(),
-                    technical_complexity: randomScore(),
-                    capital_intensity: randomScore(),
-                    market_saturation: randomScore(),
-                    business_model_robustness: randomScore(),
-                    market_growth_rate: randomScore(),
-                    social_value: randomScore()
+                    uniqueness: 0,
+                    customer_pain: 0,
+                    scalability: 0,
+                    product_market_fit: 0,
+                    technical_complexity: 0,
+                    capital_intensity: 0,
+                    market_saturation: 0,
+                    business_model_robustness: 0,
+                    market_growth_rate: 0,
+                    social_value: 0
                 });
 
-                setSuccessMessage('Idea listed successfully!');
-                setShowSuccessModal(true);
+                // Transition to Validation Step
+                setCreatedIdeaId(ideaData.idea_id); // Track ID
+                setCurrentStep(10);
+                window.scrollTo(0, 0);
             }
             // onBack() will be called when modal is closed
 
@@ -481,6 +511,102 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
             setSubmitError(err.message);
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleAIValidation = async () => {
+        setIsValidating(true);
+        setAiOutputLog('');
+        setAiInputLog('Initializing Architect-Sensor-Calculator Pipeline...');
+
+        try {
+            // Check Puter
+            const puter = (window as any).puter;
+            if (!puter) throw new Error("Puter.js not loaded. Please refresh.");
+
+            // 1. Extract PDF Text (if available)
+            let documentContent = "";
+            try {
+                if (mainDocument) {
+                    setAiInputLog(prev => prev + `\n> Reading uploaded PDF: ${mainDocument.name}...`);
+                    documentContent = await getTextFromPDF(mainDocument);
+                    setAiInputLog(prev => prev + `\n> PDF Parsed successfully (${documentContent.length} chars).`);
+                } else if (existingMainDocUrl) {
+                    setAiInputLog(prev => prev + `\n> Fetching PDF from URL: ${existingMainDocUrl}...`);
+                    documentContent = await getTextFromPDF(existingMainDocUrl);
+                    setAiInputLog(prev => prev + `\n> PDF Parsed successfully (${documentContent.length} chars).`);
+                }
+            } catch (pdfErr: any) {
+                console.error("PDF Parse Error:", pdfErr);
+                setAiInputLog(prev => prev + `\n> [WARNING]: Failed to parse PDF (${pdfErr.message}). Continuing without it.`);
+            }
+
+            // Prepare Input
+            const ideaInput = {
+                title,
+                description: shortDescription,
+                category: primaryCategory,
+                secondary_category: secondaryCategory,
+                pain_problem: painProblem,
+                pain_who: painWho,
+                solution_current: solutionCurrent,
+                solution_how: solHow,
+                monetization: revFlow,
+                price: parseFloat(price),
+                document_content: documentContent
+            };
+
+            // Run Pipeline
+            const result = await validateIdeaPipeline(ideaInput,
+                (msg: string) => {
+                    setAiOutputLog(prev => prev + `\n> ${msg}`);
+                },
+                (type: 'input' | 'output', content: string) => {
+                    if (type === 'input') {
+                        setAiInputLog(prev => prev + `\n\n${content}`);
+                    } else {
+                        setAiOutputLog(prev => prev + `\n\n${content}`);
+                    }
+                }
+            );
+
+            setValidationResult(result); // Save for UI
+            setAiOutputLog('Validation Complete');
+
+            // Update Database
+            const targetId = editId || createdIdeaId;
+            if (targetId) {
+                setAiInputLog(prev => prev + `\n> Saving scores to database for ID: ${targetId}...`);
+
+                // Store as 0-100 directly.
+                const getScore = (key: string) => result.metrics[key]?.score || 0;
+
+                const { error } = await updateAIScoring(targetId, {
+                    // overall_score: result.final_score,
+                    uniqueness: getScore('uniqueness'),
+                    customer_pain: getScore('customer_pain'),
+                    scalability: getScore('scalability'),
+                    product_market_fit: getScore('product_market_fit'),
+                    technical_complexity: getScore('technical_complexity'),
+                    capital_intensity: getScore('capital_intensity'),
+                    market_saturation: getScore('market_saturation'),
+                    business_model_robustness: getScore('business_model') || getScore('business_model_robustness'),
+                    market_growth_rate: getScore('market_growth_rate'),
+                    social_value: getScore('social_value'),
+                    validation_details: result // Save the FULL JSON
+                });
+
+                if (error) throw error;
+                setAiInputLog(prev => prev + `\n> Scores saved successfully!`);
+            } else {
+                setAiInputLog(prev => prev + `\n> [WARNING]: Could not save scores. Idea ID missing.`);
+            }
+
+        } catch (error: any) {
+            console.error("AI Pipeline Error:", error);
+            setAiOutputLog(`\n\n❌ ERROR: ${error.message || String(error)}`);
+        } finally {
+            setIsValidating(false);
         }
     };
 
@@ -888,58 +1014,161 @@ export const SellIdea: React.FC<SellIdeaProps> = ({ onBack }) => {
                         </div>
                     )}
 
-                </div>
-
-                {/* Footer Nav */}
-                <div className="mt-12 pt-6 border-t border-zinc-800 flex justify-between items-center">
-                    <button onClick={handleBack} disabled={currentStep === 1} className={`flex items-center gap-2 text-sm font-medium ${currentStep === 1 ? 'text-zinc-700 cursor-not-allowed' : 'text-zinc-400 hover:text-white'}`}>
-                        <ChevronLeftIcon className="w-4 h-4" /> Back
-                    </button>
-
-                    {currentStep < TOTAL_STEPS ? (
-                        <button onClick={handleNext} disabled={!isStepValid} className={`flex items-center gap-2 bg-[#22C55E] text-black px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-green-400 transition-all ${!isStepValid ? 'opacity-50 cursor-not-allowed' : 'shadow-[0_0_20px_rgba(34,197,94,0.3)]'}`}>
-                            Next Step <ChevronRightIcon className="w-4 h-4" />
-                        </button>
-                    ) : (
-                        <button onClick={handleSubmit} disabled={isSubmitting || !isStepValid} className={`flex items-center gap-2 bg-[#22C55E] text-black px-8 py-2.5 rounded-lg text-sm font-bold hover:bg-green-400 transition-all ${(!isStepValid || isSubmitting) ? 'opacity-50 cursor-not-allowed' : 'shadow-[0_0_20px_rgba(34,197,94,0.3)]'}`}>
-                            {isSubmitting ? 'Publishing...' : 'Publish Listing'} <CheckCircleIconSolid className="w-4 h-4" />
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            {/* Success Modal */}
-            {showSuccessModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 max-w-sm w-full relative zoom-in-95 animate-in duration-300 shadow-2xl">
-                        <div className="flex flex-col items-center text-center gap-6">
-                            {/* Success Icon */}
-                            <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center border border-green-500/20">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-10 h-10 text-green-500">
-                                    <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
-                                </svg>
+                    {/* STEP 10: AI VALIDATION */}
+                    {currentStep === 10 && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                            <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-lg text-green-400 mb-6 flex items-start gap-3">
+                                <CheckCircleIconSolid className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                                <div>
+                                    <h3 className="font-bold text-sm mb-1">Listing Published Successfully!</h3>
+                                    <p className="text-xs opacity-80">Your idea is now live. Before you go, validate it with advanced AI models.</p>
+                                </div>
                             </div>
 
-                            {/* Text */}
-                            <div className="space-y-2">
-                                <h3 className="text-2xl font-bold text-white">Success!</h3>
-                                <p className="text-zinc-400 text-sm">{successMessage}</p>
+                            <div>
+                                <Label>Select Validation Model</Label>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    {[
+                                        { id: 'gpt-4o', label: 'GPT-5.1 (Preview)' },
+                                        { id: 'gpt-4-turbo', label: 'GPT-4.1' },
+                                        { id: 'claude-3-5-sonnet', label: 'Perplexity Sonar' },
+                                        { id: 'gemini-1.5-pro', label: 'Gemini 2.5 Pro' }
+                                    ].map((model) => (
+                                        <button
+                                            key={model.id}
+                                            onClick={() => setValidationModel(model.id)}
+                                            className={`p-3 rounded-lg border text-sm font-medium transition-all ${validationModel === model.id
+                                                ? 'bg-green-500 text-black border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.3)]'
+                                                : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:border-zinc-500 hover:text-white'
+                                                }`}
+                                        >
+                                            {model.label}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
-                            {/* Button */}
                             <button
-                                onClick={() => {
-                                    setShowSuccessModal(false);
-                                    onBack();
-                                }}
-                                className="w-full bg-white hover:bg-zinc-200 text-black font-bold py-3.5 rounded-xl transition-all"
+                                onClick={handleAIValidation}
+                                disabled={isValidating}
+                                className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all ${isValidating
+                                    ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                                    : 'bg-gradient-to-r from-green-500 to-emerald-600 text-black hover:scale-[1.02] shadow-lg shadow-green-900/20'
+                                    }`}
                             >
-                                Continue
+                                {isValidating ? (
+                                    <>Processing...</>
+                                ) : (
+                                    <>
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                                            <path fillRule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813a3.75 3.75 0 002.576-2.576l.813-2.846A.75.75 0 019 4.5zM9 15a.75.75 0 01.75.75v1.5h1.5a.75.75 0 010 1.5h-1.5v1.5a.75.75 0 01-1.5 0v-1.5h-1.5a.75.75 0 010-1.5h1.5v-1.5A.75.75 0 019 15z" clipRule="evenodd" />
+                                        </svg>
+                                        Validate with AI (Free)
+                                    </>
+                                )}
                             </button>
+
+                            <div className="mt-8">
+                                {/* ValidationReport matches the new UI requirements */}
+                            </div>
+
+                            {/* Results Area */}
+                            {(isValidating || aiInputLog || validationResult) && (
+                                <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-6 min-h-[300px] font-mono text-sm overflow-hidden relative mt-8">
+                                    {isValidating && (
+                                        <div className="absolute top-4 right-4 animate-pulse flex items-center gap-2 text-[#22C55E]">
+                                            <div className="w-2 h-2 bg-[#22C55E] rounded-full"></div>
+                                            Processing...
+                                        </div>
+                                    )}
+
+                                    {validationResult ? (
+                                        <div className="space-y-4">
+                                            <ValidationReport result={validationResult} />
+                                            <div className="flex justify-end pt-4 border-t border-zinc-800 mt-4">
+                                                <button
+                                                    onClick={() => setShowDebugLogs(!showDebugLogs)}
+                                                    className="text-xs text-zinc-600 hover:text-zinc-400 underline decoration-zinc-800 underline-offset-4"
+                                                >
+                                                    {showDebugLogs ? 'Hide detailed AI logs' : 'Show detailed AI logs (Debug)'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <pre className="whitespace-pre-wrap text-zinc-400 font-mono text-xs h-[400px] overflow-y-auto custom-scrollbar">
+                                            {aiInputLog}
+                                            {aiOutputLog && <span className="text-[#22C55E]">{aiOutputLog}</span>}
+                                            {isValidating && <span className="animate-pulse">_</span>}
+                                        </pre>
+                                    )}
+
+                                    {showDebugLogs && validationResult && (
+                                        <div className="mt-8 pt-8 border-t border-zinc-800 animate-in fade-in">
+                                            <pre className="whitespace-pre-wrap text-zinc-400 font-mono text-xs h-[300px] overflow-y-auto custom-scrollbar bg-black/50 p-4 rounded-lg">
+                                                {aiInputLog}
+                                                {aiOutputLog}
+                                            </pre>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                         </div>
+                    )}
+
+                    {/* Footer Nav */}
+                    <div className="mt-12 pt-6 border-t border-zinc-800 flex justify-between items-center">
+                        <button onClick={handleBack} disabled={currentStep === 1} className={`flex items-center gap-2 text-sm font-medium ${currentStep === 1 ? 'text-zinc-700 cursor-not-allowed' : 'text-zinc-400 hover:text-white'}`}>
+                            <ChevronLeftIcon className="w-4 h-4" /> Back
+                        </button>
+
+                        {currentStep < TOTAL_STEPS ? (
+                            <button onClick={handleNext} disabled={!isStepValid} className={`flex items-center gap-2 bg-[#22C55E] text-black px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-green-400 transition-all ${!isStepValid ? 'opacity-50 cursor-not-allowed' : 'shadow-[0_0_20px_rgba(34,197,94,0.3)]'}`}>
+                                Next Step <ChevronRightIcon className="w-4 h-4" />
+                            </button>
+                        ) : (
+                            <button onClick={handleSubmit} disabled={isSubmitting || !isStepValid} className={`flex items-center gap-2 bg-[#22C55E] text-black px-8 py-2.5 rounded-lg text-sm font-bold hover:bg-green-400 transition-all ${(!isStepValid || isSubmitting) ? 'opacity-50 cursor-not-allowed' : 'shadow-[0_0_20px_rgba(34,197,94,0.3)]'}`}>
+                                {isSubmitting ? 'Publishing...' : 'Publish Listing'} <CheckCircleIconSolid className="w-4 h-4" />
+                            </button>
+                        )}
                     </div>
                 </div>
-            )}
+
+                {/* Success Modal */}
+                {
+                    showSuccessModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+                            <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 max-w-sm w-full relative zoom-in-95 animate-in duration-300 shadow-2xl">
+                                <div className="flex flex-col items-center text-center gap-6">
+                                    {/* Success Icon */}
+                                    <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center border border-green-500/20">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-10 h-10 text-green-500">
+                                            <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+                                        </svg>
+                                    </div>
+
+                                    {/* Text */}
+                                    <div className="space-y-2">
+                                        <h3 className="text-2xl font-bold text-white">Success!</h3>
+                                        <p className="text-zinc-400 text-sm">{successMessage}</p>
+                                    </div>
+
+                                    {/* Button */}
+                                    <button
+                                        onClick={() => {
+                                            setShowSuccessModal(false);
+                                            onBack();
+                                        }}
+                                        className="w-full bg-white hover:bg-zinc-200 text-black font-bold py-3.5 rounded-xl transition-all"
+                                    >
+                                        Continue
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
+            </div>
         </div>
     );
 };

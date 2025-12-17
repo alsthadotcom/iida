@@ -12,6 +12,7 @@ import { StarIcon, HeartIcon as HeartIconSolid, BookmarkIcon as BookmarkIconSoli
 import { getIdeaDetailById, getLikeStatus, toggleLike, getSaveStatus, toggleSave, getShareCount, trackShare } from '../services/database';
 import { supabase } from '../services/supabase';
 import type { IdeaDetailView } from '../types/database';
+import { ValidationReport } from './ValidationReport';
 import { User } from '@supabase/supabase-js';
 
 interface ItemDetailsProps {
@@ -197,81 +198,87 @@ export const ItemDetails: React.FC<ItemDetailsProps> = ({ ideaId, onBack }) => {
                         <p className="text-xl text-zinc-400 leading-relaxed max-w-2xl">{item.one_line_description}</p>
                     </div>
 
-                    {/* AI Scoring Metrics */}
-                    <div className="bg-zinc-900/50 backdrop-blur-xl border border-white/5 rounded-2xl p-8 shadow-lg">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="p-2 bg-purple-500/10 rounded-lg">
-                                <StarIcon className="w-6 h-6 text-purple-400" />
-                            </div>
-                            <div>
-                                <h2 className="text-xl font-bold text-white">AI Analysis Metrics</h2>
-                                <p className="text-sm text-zinc-400">Powered by IDA AI Engine</p>
-                            </div>
+                    {/* AI Scoring Metrics or Rich Report */}
+                    {item.validation_details ? (
+                        <div className="bg-zinc-900/50 backdrop-blur-xl border border-white/5 rounded-2xl p-8 shadow-lg">
+                            <ValidationReport result={item.validation_details} />
                         </div>
+                    ) : (
+                        <div className="bg-zinc-900/50 backdrop-blur-xl border border-white/5 rounded-2xl p-8 shadow-lg">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="p-2 bg-purple-500/10 rounded-lg">
+                                    <StarIcon className="w-6 h-6 text-purple-400" />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-white">AI Analysis Metrics</h2>
+                                    <p className="text-sm text-zinc-400">Powered by IDA AI Engine</p>
+                                </div>
+                            </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
-                            {[
-                                { label: 'Uniqueness', value: item.uniqueness },
-                                { label: 'Customer Pain', value: item.customer_pain },
-                                { label: 'Scalability', value: item.scalability },
-                                { label: 'Product-Market Fit', value: item.product_market_fit },
-                                { label: 'Technical Complexity', value: item.technical_complexity },
-                                { label: 'Capital Intensity', value: item.capital_intensity },
-                                { label: 'Market Saturation', value: item.market_saturation },
-                                { label: 'Business Model', value: item.business_model_robustness },
-                                { label: 'Market Growth', value: item.market_growth_rate },
-                                { label: 'Social Value', value: item.social_value }
-                            ].map((metric, idx) => {
-                                const getStrokeColor = (value: number) => {
-                                    if (value >= 75) return '#22c55e'; // green
-                                    if (value >= 50) return '#eab308'; // yellow
-                                    return '#f97316'; // orange
-                                };
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+                                {[
+                                    { label: 'Uniqueness', value: item.uniqueness },
+                                    { label: 'Customer Pain', value: item.customer_pain },
+                                    { label: 'Scalability', value: item.scalability },
+                                    { label: 'Product-Market Fit', value: item.product_market_fit },
+                                    { label: 'Technical Complexity', value: item.technical_complexity },
+                                    { label: 'Capital Intensity', value: item.capital_intensity },
+                                    { label: 'Market Saturation', value: item.market_saturation },
+                                    { label: 'Business Model', value: item.business_model_robustness },
+                                    { label: 'Market Growth', value: item.market_growth_rate },
+                                    { label: 'Social Value', value: item.social_value }
+                                ].map((metric, idx) => {
+                                    const getStrokeColor = (value: number) => {
+                                        if (value >= 75) return '#22c55e'; // green
+                                        if (value >= 50) return '#eab308'; // yellow
+                                        return '#f97316'; // orange
+                                    };
 
-                                const radius = 40;
-                                const circumference = 2 * Math.PI * radius;
-                                const strokeDashoffset = circumference - (metric.value / 100) * circumference;
+                                    const radius = 40;
+                                    const circumference = 2 * Math.PI * radius;
+                                    const strokeDashoffset = circumference - (metric.value / 100) * circumference;
 
-                                return (
-                                    <div key={idx} className="flex flex-col items-center gap-3">
-                                        <div className="relative">
-                                            <svg className="transform -rotate-90" width="100" height="100">
-                                                {/* Background circle */}
-                                                <circle
-                                                    cx="50"
-                                                    cy="50"
-                                                    r={radius}
-                                                    stroke="#27272a"
-                                                    strokeWidth="8"
-                                                    fill="none"
-                                                />
-                                                {/* Progress circle */}
-                                                <circle
-                                                    cx="50"
-                                                    cy="50"
-                                                    r={radius}
-                                                    stroke={getStrokeColor(metric.value)}
-                                                    strokeWidth="8"
-                                                    fill="none"
-                                                    strokeDasharray={circumference}
-                                                    strokeDashoffset={strokeDashoffset}
-                                                    strokeLinecap="round"
-                                                    className="transition-all duration-1000 ease-out"
-                                                />
-                                            </svg>
-                                            {/* Center text */}
-                                            <div className="absolute inset-0 flex items-center justify-center">
-                                                <span className="text-xl font-bold text-white">{metric.value}</span>
+                                    return (
+                                        <div key={idx} className="flex flex-col items-center gap-3">
+                                            <div className="relative">
+                                                <svg className="transform -rotate-90" width="100" height="100">
+                                                    {/* Background circle */}
+                                                    <circle
+                                                        cx="50"
+                                                        cy="50"
+                                                        r={radius}
+                                                        stroke="#27272a"
+                                                        strokeWidth="8"
+                                                        fill="none"
+                                                    />
+                                                    {/* Progress circle */}
+                                                    <circle
+                                                        cx="50"
+                                                        cy="50"
+                                                        r={radius}
+                                                        stroke={getStrokeColor(metric.value)}
+                                                        strokeWidth="8"
+                                                        fill="none"
+                                                        strokeDasharray={circumference}
+                                                        strokeDashoffset={strokeDashoffset}
+                                                        strokeLinecap="round"
+                                                        className="transition-all duration-1000 ease-out"
+                                                    />
+                                                </svg>
+                                                {/* Center text */}
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                    <span className="text-xl font-bold text-white">{metric.value}</span>
+                                                </div>
+                                            </div>
+                                            <div className="text-center">
+                                                <p className="text-xs font-medium text-zinc-300">{metric.label}</p>
                                             </div>
                                         </div>
-                                        <div className="text-center">
-                                            <p className="text-xs font-medium text-zinc-300">{metric.label}</p>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Locked Content Area */}
                     <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-2xl p-12 flex flex-col items-center justify-center text-center space-y-6 relative overflow-hidden group">
